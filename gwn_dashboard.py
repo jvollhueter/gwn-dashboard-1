@@ -772,6 +772,7 @@ def main():
         "Auswahlmodus:",
         ["Eigene Auswahl", "Alle GWK"]
     )
+    index=1
     
     # if selection_mode == "Vordefinierte Auswahl":
     #     # Standard 4 GWK
