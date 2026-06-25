@@ -746,8 +746,11 @@ def load_messstellen_data(cache_dir: str = "./cache") -> pd.DataFrame:
     mkz_gwk_path = Path(__file__).parent / "data" / "MKZ_GWK.csv"
     
     if mkz_gwk_path.exists():
-        mess_gwk = pd.read_csv(mkz_gwk_path, sep=';', thousands='.', decimal=',')
+        mess_gwk = pd.read_csv(mkz_gwk_path, sep=';', quotechar='"', dtype={'MKZ': str})
         mess_gwk = mess_gwk.fillna("na")
+        # Sicherstellen, dass MKZ-Spalte in beiden DataFrames als String vorliegt
+        messstellen['MKZ'] = messstellen['MKZ'].astype(str)
+        mess_gwk['MKZ'] = mess_gwk['MKZ'].astype(str)
         messstellen = messstellen.merge(mess_gwk, on="MKZ", how="outer")
     else:
         st.warning(f"⚠️ MKZ_GWK.csv nicht gefunden unter {mkz_gwk_path}")
