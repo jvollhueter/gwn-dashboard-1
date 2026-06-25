@@ -746,26 +746,35 @@ def load_messstellen_data(cache_dir: str = "./cache") -> pd.DataFrame:
     mkz_gwk_path = Path(__file__).parent / "data" / "MKZ_GWK.csv"
     
     if mkz_gwk_path.exists():
-        mess_gwk = pd.read_csv(mkz_gwk_path, sep=';', quotechar='"', dtype={'MKZ': str})
+        mess_gwk = pd.read_csv(
+            mkz_gwk_path, 
+            sep=';', 
+            quotechar='"', 
+            decimal=',',
+            dtype={'MKZ': str}
+        )
         mess_gwk = mess_gwk.fillna("na")
         # Sicherstellen, dass MKZ-Spalte in beiden DataFrames als String vorliegt
         messstellen['MKZ'] = messstellen['MKZ'].astype(str)
         mess_gwk['MKZ'] = mess_gwk['MKZ'].astype(str)
-        messstellen = messstellen.merge(mess_gwk, on="MKZ", how="outer")
+        # Merge: left join, um alle Messstellen zu behalten
+        messstellen = messstellen.merge(mess_gwk, on="MKZ", how="left", suffixes=('', '_gwk'))
     else:
         st.warning(f"⚠️ MKZ_GWK.csv nicht gefunden unter {mkz_gwk_path}")
         messstellen['GWK'] = "unbekannt"
         messstellen['GWK25'] = "unbekannt"
     
-    # Datums-Spalten konvertieren (falls vorhanden)
+    # Datums-Spalten konvertieren
     if 'Erstes_Messdatum' in messstellen.columns:
         messstellen['Erstes_Messdatum'] = pd.to_datetime(messstellen['Erstes_Messdatum'], format='%Y-%m-%d', errors='coerce')
     if 'Letztes_Messdatum' in messstellen.columns:
         messstellen['Letztes_Messdatum'] = pd.to_datetime(messstellen['Letztes_Messdatum'], format='%Y-%m-%d', errors='coerce')
+    
+    # GRIMM-STRELE konvertieren (falls aus MKZ_GWK.csv vorhanden)
     if 'GRIMM-STRELE' in messstellen.columns:
         messstellen['GRIMM-STRELE'] = pd.to_numeric(messstellen['GRIMM-STRELE'], errors='coerce')
     
-    # Koordinatentransformation ETRS89 → WGS84 (falls Koordinaten vorhanden)
+    # Koordinatentransformation ETRS89 → WGS84
     if 'RW_ETRS89' in messstellen.columns and 'HW_ETRS89' in messstellen.columns:
         transformer = Transformer.from_crs("EPSG:25833", "EPSG:4326")
         lat, lon = transformer.transform(messstellen.RW_ETRS89.values, messstellen.HW_ETRS89.values)
