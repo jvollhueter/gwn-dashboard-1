@@ -757,17 +757,23 @@ def load_messstellen_data(cache_dir: str = "./cache") -> pd.DataFrame:
         messstellen['GWK'] = "unbekannt"
         messstellen['GWK25'] = "unbekannt"
     
-    # Datums-Spalten konvertieren
-    messstellen['Erstes_Messdatum'] = pd.to_datetime(messstellen['Erstes_Messdatum'], format='%Y-%m-%d', errors='coerce')
-    messstellen['Letztes_Messdatum'] = pd.to_datetime(messstellen['Letztes_Messdatum'], format='%Y-%m-%d', errors='coerce')
-    messstellen['GRIMM-STRELE'] = pd.to_numeric(messstellen['GRIMM-STRELE'], errors='coerce')
+    # Datums-Spalten konvertieren (falls vorhanden)
+    if 'Erstes_Messdatum' in messstellen.columns:
+        messstellen['Erstes_Messdatum'] = pd.to_datetime(messstellen['Erstes_Messdatum'], format='%Y-%m-%d', errors='coerce')
+    if 'Letztes_Messdatum' in messstellen.columns:
+        messstellen['Letztes_Messdatum'] = pd.to_datetime(messstellen['Letztes_Messdatum'], format='%Y-%m-%d', errors='coerce')
+    if 'GRIMM-STRELE' in messstellen.columns:
+        messstellen['GRIMM-STRELE'] = pd.to_numeric(messstellen['GRIMM-STRELE'], errors='coerce')
     
-    # Koordinatentransformation ETRS89 → WGS84
-    transformer = Transformer.from_crs("EPSG:25833", "EPSG:4326")
-    lat, lon = transformer.transform(messstellen.RW_ETRS89.values, messstellen.HW_ETRS89.values)
-    
-    messstellen['lat'] = lat
-    messstellen['lon'] = lon
+    # Koordinatentransformation ETRS89 → WGS84 (falls Koordinaten vorhanden)
+    if 'RW_ETRS89' in messstellen.columns and 'HW_ETRS89' in messstellen.columns:
+        transformer = Transformer.from_crs("EPSG:25833", "EPSG:4326")
+        lat, lon = transformer.transform(messstellen.RW_ETRS89.values, messstellen.HW_ETRS89.values)
+        messstellen['lat'] = lat
+        messstellen['lon'] = lon
+    else:
+        messstellen['lat'] = None
+        messstellen['lon'] = None
     
     return messstellen
 
