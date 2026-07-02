@@ -138,7 +138,7 @@ def find_parameter_csv(base_dir: Path, parameter: str) -> Optional[Path]:
 @st.cache_data
 def load_monthly_csv(csv_path: Path) -> pd.DataFrame:
     """Lädt monatliche CSV-Datei"""
-    df = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+    df = pd.read_csv(csv_path, sep=",", encoding="utf-8")
     df.columns = df.columns.str.strip()
     
     # Datum parsen
