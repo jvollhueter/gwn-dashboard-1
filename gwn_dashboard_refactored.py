@@ -229,41 +229,48 @@ def create_messstellen_plot(mkz: str, gwk_id: str, cache_dir: str = "./cache"):
         if df is None or df.empty:
             return None
         
+        # WICHTIG: Die Spalte heißt 'MESSZEITPUNKT', nicht 'Datum'
+        # Und der Wert ist 'WERT_UNTER_GELAENDE', nicht 'Wert'
+        
         # Plot erstellen
         fig = go.Figure()
         
         fig.add_trace(go.Scatter(
-            x=df['Datum'],
-            y=df['Wert'],
+            x=df['MESSZEITPUNKT'],  # ← KORRIGIERT (war: 'Datum')
+            y=df['WERT_UNTER_GELAENDE'],  # ← KORRIGIERT (war: 'Wert')
             mode='lines',
             name=f'GW-Stand {mkz}',
             line=dict(color='steelblue', width=2),
-            hovertemplate='<b>Datum:</b> %{x}<br><b>GW-Stand:</b> %{y:.2f} m ü. NHN<extra></extra>'
+            hovertemplate='<b>Datum:</b> %{x}<br><b>GW-Stand:</b> %{y:.2f} cm u. Gelände<extra></extra>'
         ))
         
         # Mittelwert
-        mean_val = df['Wert'].mean()
+        mean_val = df['WERT_UNTER_GELAENDE'].mean()  # ← KORRIGIERT
         fig.add_hline(
             y=mean_val,
             line_dash="dash",
             line_color="red",
-            annotation_text=f"Ø {mean_val:.2f} m",
+            annotation_text=f"Ø {mean_val:.2f} cm",
             annotation_position="right"
         )
         
         fig.update_layout(
             title=f"<b>Ganglinie Messstelle {mkz}</b> (GWK: {gwk_id})",
             xaxis_title="Datum",
-            yaxis_title="Grundwasserstand [m ü. NHN]",
+            yaxis_title="Grundwasserstand [cm unter Gelände]",
             hovermode='x unified',
             height=500,
             template='plotly_white'
         )
         
+        # Y-Achse umkehren (je tiefer, desto niedriger der Wasserstand)
+        fig.update_yaxes(autorange="reversed")
+        
         return fig
     
     except Exception as e:
         logger.exception(f"Messstellen-Plot failed for {mkz}")
+        st.error(f"Fehler beim Erstellen des Plots für {mkz}: {e}")
         return None
 
 
