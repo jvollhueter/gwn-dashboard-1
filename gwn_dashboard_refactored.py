@@ -627,132 +627,139 @@ def create_gwk_map(gdf, comparison_df, selected_gwk=None):
 # MESSSTELLEN-FUNKTIONEN (von gwn_dashboard_24062026_v3.py kopiert)
 # ============================================================================
 
+from urllib.request import urlretrieve
+from pyproj import Transformer
+from sklearn import linear_model
+import datetime
+
+@st.cache_data
+def cacheorload(filename: str, cache_dir: str = "./cache") -> None:
+    """Lädt Datei von NIWIS, falls nicht lokal vorhanden"""
+    os.makedirs(cache_dir, exist_ok=True)
+    filepath = os.path.join(cache_dir, filename)
+    if not os.path.isfile(filepath):
+        url = "https://www.umwelt.sachsen.de/umwelt/infosysteme/niwis/weitere/"
+        try:
+            urlretrieve(url + filename, filepath)
+        except Exception as e:
+            st.error(f"Download fehlgeschlagen: {filename}\n{e}")
+    return
+
+
 @st.cache_data
 def load_messstellen_data(cache_dir: str = "./cache") -> pd.DataFrame:
-    """Lädt Messstellen-Übersicht von NIWIS"""
+    """Lädt Messstellenübersicht mit GWK-Zuordnung"""
     
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(exist_ok=True, parents=True)
+    # Übersicht laden
+    cacheorload('Export_MKZ_Uebersicht.csv', cache_dir)
+    messstellen = pd.read_csv(
+        os.path.join(cache_dir, 'Export_MKZ_Uebersicht.csv'),
+        sep=';',
+        thousands='.',
+        decimal=','
+    )
     
-    cache_file = cache_path / "messstellen_uebersicht.csv"
+    # GWK-Mapping laden (lokal, muss im Repo liegen)
+    mkz_gwk_path = Path(__file__).parent / "data" / "MKZ_GWK.csv"
     
-    # Cache prüfen
-    if cache_file.exists():
-        return pd.read_csv(cache_file, sep=";", encoding="utf-8", parse_dates=["Erstes_Messdatum", "Letztes_Messdatum"])
+    if mkz_gwk_path.exists():
+        mess_gwk = pd.read_csv(
+            mkz_gwk_path, 
+            sep=';', 
+            quotechar='"', 
+            decimal=',',
+            dtype={'MKZ': str}
+        )
+        mess_gwk = mess_gwk.fillna("na")
+        # Sicherstellen, dass MKZ-Spalte in beiden DataFrames als String vorliegt
+        messstellen['MKZ'] = messstellen['MKZ'].astype(str)
+        mess_gwk['MKZ'] = mess_gwk['MKZ'].astype(str)
+        # Merge: left join, um alle Messstellen zu behalten
+        messstellen = messstellen.merge(mess_gwk, on="MKZ", how="left", suffixes=('', '_gwk'))
+    else:
+        st.warning(f"⚠️ MKZ_GWK.csv nicht gefunden unter {mkz_gwk_path}")
+        messstellen['GWK'] = "unbekannt"
+        messstellen['GWK25'] = "unbekannt"
     
-    # Von NIWIS laden
-    url = "https://www.umwelt.sachsen.de/umwelt/infosysteme/niwis/weitere/"
-    local_file = cache_path / "messstellen_temp.csv"
+    # Datums-Spalten konvertieren
+    if 'Erstes_Messdatum' in messstellen.columns:
+        messstellen['Erstes_Messdatum'] = pd.to_datetime(messstellen['Erstes_Messdatum'], format='%Y-%m-%d', errors='coerce')
+    if 'Letztes_Messdatum' in messstellen.columns:
+        messstellen['Letztes_Messdatum'] = pd.to_datetime(messstellen['Letztes_Messdatum'], format='%Y-%m-%d', errors='coerce')
     
-    urlretrieve(url, local_file)
+    # GRIMM-STRELE konvertieren (falls aus MKZ_GWK.csv vorhanden)
+    if 'GRIMM-STRELE' in messstellen.columns:
+        messstellen['GRIMM-STRELE'] = pd.to_numeric(messstellen['GRIMM-STRELE'], errors='coerce')
     
-    # Einlesen
-    df = pd.read_csv(local_file, sep=";", encoding="utf-8")
+    # Koordinatentransformation ETRS89 → WGS84
+    if 'RW_ETRS89' in messstellen.columns and 'HW_ETRS89' in messstellen.columns:
+        transformer = Transformer.from_crs("EPSG:25833", "EPSG:4326")
+        lat, lon = transformer.transform(messstellen.RW_ETRS89.values, messstellen.HW_ETRS89.values)
+        messstellen['lat'] = lat
+        messstellen['lon'] = lon
+    else:
+        messstellen['lat'] = None
+        messstellen['lon'] = None
     
-    # Datumspalten konvertieren
-    for col in ["Erstes_Messdatum", "Letztes_Messdatum"]:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], format="%d.%m.%Y", errors='coerce')
-    
-    # Speichern
-    df.to_csv(cache_file, sep=";", encoding="utf-8", index=False)
-    
-    return df
+    return messstellen
 
 
 @st.cache_data
 def load_mkz_timeseries(mkz: str, cache_dir: str = "./cache") -> pd.DataFrame:
-    """Lädt Zeitreihe für eine Messstelle"""
+    """Lädt Zeitreihe für eine MKZ"""
     
-    cache_path = Path(cache_dir)
-    cache_path.mkdir(exist_ok=True, parents=True)
+    cacheorload(f"ExportSN_GWS-Rohdaten_{mkz}.csv", cache_dir)
     
-    cache_file = cache_path / f"mkz_{mkz}.csv"
+    df = pd.read_csv(
+        os.path.join(cache_dir, f'ExportSN_GWS-Rohdaten_{mkz}.csv'),
+        sep=';',
+        thousands='.',
+        decimal=','
+    )
     
-    # Cache prüfen
-    if cache_file.exists():
-        df = pd.read_csv(cache_file, sep=";", encoding="utf-8", parse_dates=["MESSZEITPUNKT"])
-        return df
+    df['MESSZEITPUNKT'] = pd.to_datetime(df['MESSZEITPUNKT'], format='%Y-%m-%d', errors='coerce')
+    df['WERT_UNTER_GELAENDE'] = df['WERT_UNTER_GELAENDE'].astype('Float64')
+    df['MKZ'] = df['MKZ'].astype('string')
     
-    # Von NIWIS laden
-    url = f"https://www.umwelt.sachsen.de/umwelt/infosysteme/niwis/messwerte.ashx?para=gw&kat=messwerte&mkz={mkz}"
-    local_file = cache_path / f"mkz_{mkz}_temp.csv"
+    return df
+
+
+def compute_mkz_trend(mkz: str, trend_ab: datetime.date, trend_bis: datetime.date, cache_dir: str = "./cache") -> dict:
+    """Berechnet Trend für eine MKZ nach Grimm-Strele"""
     
     try:
-        urlretrieve(url, local_file)
+        df = load_mkz_timeseries(mkz, cache_dir)
         
-        # Einlesen
-        df = pd.read_csv(local_file, sep=";", encoding="utf-8")
+        df = df.set_index('MESSZEITPUNKT')
+        df = df.loc[:, "WERT_UNTER_GELAENDE"]
+        df = df.resample('MS').mean()
+        df = df.dropna()
         
-        # Datum konvertieren
-        if "MESSZEITPUNKT" in df.columns:
-            df["MESSZEITPUNKT"] = pd.to_datetime(df["MESSZEITPUNKT"], format="%d.%m.%Y", errors='coerce')
+        df = df.loc[(df.index >= pd.to_datetime(trend_ab)) & (df.index <= pd.to_datetime(trend_bis))]
         
-        # Speichern
-        df.to_csv(cache_file, sep=";", encoding="utf-8", index=False)
+        if df.shape[0] <= 1:
+            return {"error": "Zu wenige Daten"}
         
-        return df
+        x = (df.index - df.index[0]).days.values.reshape(-1, 1) / 365.0
+        y = df.values
+        
+        model = linear_model.LinearRegression().fit(x, y)
+        
+        slope = -model.coef_[0]  # negativ weil "Anstieg unter Gelände" = Absinken
+        spanne = y.max() - y.min()
+        grimm_strele = slope / spanne * 100.0 if spanne > 0.01 else np.nan
+        
+        return {
+            "MKZ": mkz,
+            "Anstieg [cm/a]": slope,
+            "Spanne [cm]": spanne,
+            "Grimm-Strele [%/a]": grimm_strele,
+            "Anzahl Werte": len(y),
+            "Trend": "fallend" if grimm_strele < -1 else ("steigend" if grimm_strele > 1 else "stabil")
+        }
     
     except Exception as e:
-        logger.error(f"Fehler beim Laden von MKZ {mkz}: {e}")
-        return pd.DataFrame()
-
-
-def compute_mkz_trend(mkz: str, trend_ab: date, trend_bis: date, cache_dir: str = "./cache") -> dict:
-    """Berechnet Grimm-Strele Trend für Messstelle"""
-    
-    df = load_mkz_timeseries(mkz, cache_dir)
-    
-    if df.empty:
-        return {"error": "Keine Daten verfügbar"}
-    
-    # Zeitraum filtern
-    df_trend = df[
-        (df["MESSZEITPUNKT"] >= pd.to_datetime(trend_ab)) &
-        (df["MESSZEITPUNKT"] <= pd.to_datetime(trend_bis))
-    ].copy()
-    
-    if len(df_trend) < 2:
-        return {"error": "Zu wenige Datenpunkte im Zeitraum"}
-    
-    # Monatsmittel
-    df_monthly = df_trend.set_index("MESSZEITPUNKT")["WERT_UNTER_GELAENDE"].resample("MS").mean().dropna()
-    
-    if len(df_monthly) < 2:
-        return {"error": "Zu wenige Monatsmittel"}
-    
-    # Lineare Regression
-    x = (df_monthly.index - df_monthly.index[0]).days.values.reshape(-1, 1) / 365.0
-    y = df_monthly.values
-    
-    model = linear_model.LinearRegression().fit(x, y)
-    anstieg_cm_a = model.coef_[0]
-    
-    # Grimm-Strele
-    mittelwert = y.mean()
-    spanne = y.max() - y.min()
-    grimm_strele = (anstieg_cm_a / mittelwert) * 100 if mittelwert != 0 else 0
-    
-    # Trendklassifikation
-    if grimm_strele <= -1:
-        trend = "Fallend"
-    elif grimm_strele > 1:
-        trend = "Steigend"
-    else:
-        trend = "Stabil"
-    
-    return {
-        "MKZ": mkz,
-        "Trend von": trend_ab.strftime("%Y-%m-%d"),
-        "Trend bis": trend_bis.strftime("%Y-%m-%d"),
-        "Anzahl Werte": len(df_trend),
-        "Anstieg [cm/a]": anstieg_cm_a,
-        "Grimm-Strele [%/a]": grimm_strele,
-        "Spanne [cm]": spanne,
-        "Trend": trend
-    }
-
-
+        return {"error": str(e)}
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
