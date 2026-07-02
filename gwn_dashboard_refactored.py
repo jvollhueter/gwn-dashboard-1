@@ -97,11 +97,32 @@ def _inject_global_css() -> None:
 
 @st.cache_data
 def load_gwk_mapping(mapping_csv: str) -> pd.DataFrame:
-    """Lädt GWK-Mapping aus CSV"""
-    df = pd.read_csv(mapping_csv, sep=";", encoding="utf-8")
+    """Lädt GWK-Mapping aus CSV - erwartet Format: id,name,desc"""
+    
+    # CSV einlesen mit KOMMA als Trennzeichen
+    df = pd.read_csv(mapping_csv, sep=",", encoding="utf-8")
+    
+    # Strikt prüfen: desc muss existieren
+    if "desc" not in df.columns:
+        raise KeyError(
+            f"Spalte 'desc' nicht in CSV gefunden!\n"
+            f"Verfügbare Spalten: {df.columns.tolist()}\n"
+            f"Erwartetes Format: id,name,desc"
+        )
+    
+    # GWK_ID aus 'desc' Spalte erstellen
     df["GWK_ID"] = df["desc"].astype(str).str.strip()
+    
+    # ID-Spalte prüfen
+    if "id" not in df.columns:
+        raise KeyError(
+            f"Spalte 'id' nicht in CSV gefunden!\n"
+            f"Verfügbare Spalten: {df.columns.tolist()}\n"
+            f"Erwartetes Format: id,name,desc"
+        )
+    
     return df[["id", "GWK_ID"]]
-
+    
 
 def find_parameter_csv(base_dir: Path, parameter: str) -> Optional[Path]:
     """Findet CSV-Datei für Parameter"""
