@@ -1,23 +1,28 @@
 """
 GWN Dashboard - Grundwasserneubildung Analyse
 Refactored mit modernem Layout und verbesserter UX
+EIGENSTÄNDIGE VERSION - Keine externen Code-Abhängigkeiten
 """
 
 from __future__ import annotations
 
 import logging
+import glob
 from pathlib import Path
-from typing import TYPE_CHECKING
-import json
+from typing import Optional, List, Dict, Tuple
 from datetime import datetime, date
+from urllib.request import urlretrieve
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-
-if TYPE_CHECKING:
-    import geopandas as gpd
+from plotly.subplots import make_subplots
+import geopandas as gpd
+from pyproj import Transformer
+from scipy.stats import linregress, kendalltau
+from sklearn import linear_model
+import plotly.express as px
 
 logger = logging.getLogger(__name__)
 
@@ -87,39 +92,421 @@ def _inject_global_css() -> None:
 
 
 # ============================================================================
-# IMPORT FUNKTIONEN AUS ORIGINAL
+# DATENVERARBEITUNGS-FUNKTIONEN (von gwn_dashboard_24062026_v3.py kopiert)
 # ============================================================================
 
-from gwn_dashboard_24062026_v3 import (
-    # Datenverarbeitung
-    load_gwk_mapping,
-    compute_gwn_yearly,
-    compute_parameter_yearly,
-    attach_gwk_id,
-    aggregate_to_gwk,
-    filter_target_gwk,
-    period_stats,
-    compute_trend_stats,
-    load_all_data,
+@st.cache_data
+def load_gwk_mapping(mapping_csv: str) -> pd.DataFrame:
+    """Lädt GWK-Mapping aus CSV"""
+    df = pd.read_csv(mapping_csv, sep=";", encoding="utf-8")
+    df["GWK_ID"] = df["desc"].astype(str).str.strip()
+    return df[["id", "GWK_ID"]]
+
+
+def find_parameter_csv(base_dir: Path, parameter: str) -> Optional[Path]:
+    """Findet CSV-Datei für Parameter"""
+    folder_glob = str(base_dir / f"{parameter}_*_all_month")
+    folders = glob.glob(folder_glob)
+    if not folders:
+        return None
+    folder = Path(sorted(folders)[0])
+    csv_path = folder / f"{folder.name}.csv"
+    return csv_path if csv_path.exists() else None
+
+
+@st.cache_data
+def load_monthly_csv(csv_path: Path) -> pd.DataFrame:
+    """Lädt monatliche CSV-Datei"""
+    df = pd.read_csv(csv_path, sep=";", encoding="utf-8")
+    df.columns = df.columns.str.strip()
     
-    # Plots
-    create_interactive_timeseries,
-    create_correlation_plot,
-    create_comparison_barplot,
+    # Datum parsen
+    if "month" in df.columns and "year" in df.columns:
+        df["date"] = pd.to_datetime(df[["year", "month"]].assign(day=1))
     
-    # Messstellen
-    load_messstellen_data,
-    load_mkz_timeseries,
-    compute_mkz_trend,
-)
+    return df
+
+
+def monthly_to_yearly_sum(df_monthly: pd.DataFrame, value_name: str) -> pd.DataFrame:
+    """Aggregiert monatliche Daten zu Jahressummen"""
+    return (
+        df_monthly.groupby(["id", "year"], as_index=False)["value"]
+        .sum()
+        .rename(columns={"value": value_name})
+    )
+
+
+@st.cache_data
+def compute_gwn_yearly(base_dir: Path) -> pd.DataFrame:
+    """Berechnet jährliche GWN aus rg1 + rg2"""
+    rg1_csv = find_parameter_csv(base_dir, "rg1")
+    rg2_csv = find_parameter_csv(base_dir, "rg2")
+    
+    if rg1_csv is None or rg2_csv is None:
+        raise FileNotFoundError("rg1 oder rg2 CSV nicht gefunden")
+    
+    df_rg1 = load_monthly_csv(rg1_csv)
+    df_rg2 = load_monthly_csv(rg2_csv)
+    
+    rg1_yearly = monthly_to_yearly_sum(df_rg1, "rg1_mm_a")
+    rg2_yearly = monthly_to_yearly_sum(df_rg2, "rg2_mm_a")
+    
+    # Merge
+    df_gwn = pd.merge(rg1_yearly, rg2_yearly, on=["id", "year"], how="outer")
+    df_gwn["gwn_mm_a"] = df_gwn["rg1_mm_a"].fillna(0) + df_gwn["rg2_mm_a"].fillna(0)
+    
+    return df_gwn[["id", "year", "gwn_mm_a"]]
+
+
+@st.cache_data
+def compute_parameter_yearly(base_dir: Path, parameter: str) -> pd.DataFrame:
+    """Berechnet jährliche Werte für Parameter (P, ETp)"""
+    csv_path = find_parameter_csv(base_dir, parameter)
+    
+    if csv_path is None:
+        raise FileNotFoundError(f"{parameter} CSV nicht gefunden")
+    
+    df = load_monthly_csv(csv_path)
+    return monthly_to_yearly_sum(df, "value")
+
+
+@st.cache_data
+def load_gwk_geometries(shapefile_path: str) -> gpd.GeoDataFrame:
+    """Lädt GWK-Geometrien aus Shapefile"""
+    gdf = gpd.read_file(shapefile_path)
+    
+    # Koordinatensystem prüfen und ggf. nach WGS84 transformieren
+    if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
+        gdf = gdf.to_crs(epsg=4326)
+    
+    # Spalte 'desc' als GWK_ID verwenden
+    if 'desc' in gdf.columns:
+        gdf['GWK_ID'] = gdf['desc'].astype(str).str.strip()
+    
+    return gdf
+
+
+def attach_gwk_id(df_id_year: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    """Hängt GWK_ID an DataFrame"""
+    return pd.merge(df_id_year, mapping, on="id", how="left")
+
+
+def aggregate_to_gwk(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    """Aggregiert Daten auf GWK-Ebene"""
+    return (
+        df.dropna(subset=["GWK_ID"])
+        .groupby(["GWK_ID", "year"], as_index=False)[value_col]
+        .mean()
+    )
+
+
+def filter_target_gwk(df: pd.DataFrame, target_gwk: List[str]) -> pd.DataFrame:
+    """Filtert auf Ziel-GWK"""
+    return df[df["GWK_ID"].isin(target_gwk)].copy()
+
+
+def period_stats(df: pd.DataFrame, value_col: str, start: int, end: int) -> pd.DataFrame:
+    """Berechnet Statistiken für Periode"""
+    sub = df[(df["year"] >= start) & (df["year"] <= end)].copy()
+    rows = []
+    for gwk, g in sub.groupby("GWK_ID"):
+        rows.append({
+            "GWK_ID": gwk,
+            "mean": g[value_col].mean(),
+            "std": g[value_col].std(),
+            "n_years": len(g)
+        })
+    return pd.DataFrame(rows)
+
+
+def compute_trend_stats(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
+    """Berechnet Trendstatistiken für jedes GWK"""
+    rows = []
+    for gwk, g in df.groupby("GWK_ID"):
+        x = g["year"].values
+        y = g[value_col].values
+        
+        n = len(g)
+        mean_val = y.mean()
+        std_val = y.std()
+        
+        # Lineare Regression
+        lr = linregress(x, y)
+        
+        # Kendall-Tau
+        kt = kendalltau(x, y)
+        
+        rows.append({
+            "GWK_ID": gwk,
+            "n_years": n,
+            "mean": mean_val,
+            "std": std_val,
+            "lr_slope": lr.slope,
+            "lr_intercept": lr.intercept,
+            "lr_rvalue": lr.rvalue,
+            "lr_pvalue": lr.pvalue,
+            "kendall_tau": kt.correlation,
+            "kendall_p": kt.pvalue
+        })
+    
+    return pd.DataFrame(rows)
+
+
+@st.cache_data
+def load_all_data(data_base_dir: str, mapping_csv: str, target_gwk: List[str]) -> Dict:
+    """Lädt alle Daten (GWN, P, ETp) und berechnet Statistiken"""
+    
+    base_path = Path(data_base_dir)
+    mapping = load_gwk_mapping(mapping_csv)
+    
+    # GWN berechnen
+    df_gwn = compute_gwn_yearly(base_path)
+    df_gwn = attach_gwk_id(df_gwn, mapping)
+    df_gwn = aggregate_to_gwk(df_gwn, "gwn_mm_a")
+    df_gwn = filter_target_gwk(df_gwn, target_gwk)
+    
+    # Niederschlag
+    df_precip = compute_parameter_yearly(base_path, "P")
+    df_precip = attach_gwk_id(df_precip, mapping)
+    df_precip = aggregate_to_gwk(df_precip, "value")
+    df_precip = filter_target_gwk(df_precip, target_gwk)
+    
+    # ETp
+    df_etp = compute_parameter_yearly(base_path, "ETp")
+    df_etp = attach_gwk_id(df_etp, mapping)
+    df_etp = aggregate_to_gwk(df_etp, "value")
+    df_etp = filter_target_gwk(df_etp, target_gwk)
+    
+    # Periodenvergleich
+    ref_start, ref_end = 1961, 1990
+    hist_start, hist_end = 1991, 2020
+    
+    stats_ref = period_stats(df_gwn, "gwn_mm_a", ref_start, ref_end)
+    stats_hist = period_stats(df_gwn, "gwn_mm_a", hist_start, hist_end)
+    
+    comparison = pd.merge(
+        stats_ref.rename(columns={"mean": "mean_ref", "std": "std_ref", "n_years": "n_years_ref"}),
+        stats_hist.rename(columns={"mean": "mean_hist", "std": "std_hist", "n_years": "n_years_hist"}),
+        on="GWK_ID",
+        how="outer"
+    )
+    
+    comparison["delta_abs"] = comparison["mean_hist"] - comparison["mean_ref"]
+    comparison["delta_rel_pct"] = (comparison["delta_abs"] / comparison["mean_ref"]) * 100
+    
+    # Trendstatistik
+    trend = compute_trend_stats(df_gwn, "gwn_mm_a")
+    
+    return {
+        "gwn": df_gwn,
+        "precip": df_precip,
+        "etp": df_etp,
+        "comparison": comparison,
+        "trend": trend
+    }
 
 
 # ============================================================================
-# KARTEN-FUNKTIONEN (Original übernommen)
+# PLOT-FUNKTIONEN (von gwn_dashboard_24062026_v3.py kopiert)
 # ============================================================================
+
+def create_interactive_timeseries(df_gwn, df_precip, df_etp, gwk, show_precip=True, show_etp=True):
+    """Erstellt interaktiven Zeitreihenplot mit Plotly"""
+    
+    # Daten filtern
+    gwn_data = df_gwn[df_gwn['GWK_ID'] == gwk].sort_values('year')
+    precip_data = df_precip[df_precip['GWK_ID'] == gwk].sort_values('year')
+    etp_data = df_etp[df_etp['GWK_ID'] == gwk].sort_values('year')
+    
+    # Perioden
+    ref_start, ref_end = 1961, 1990
+    hist_start, hist_end = 1991, 2020
+    
+    # Mittelwerte berechnen
+    gwn_ref = gwn_data[(gwn_data['year'] >= ref_start) & (gwn_data['year'] <= ref_end)]['gwn_mm_a'].mean()
+    gwn_hist = gwn_data[(gwn_data['year'] >= hist_start) & (gwn_data['year'] <= hist_end)]['gwn_mm_a'].mean()
+    
+    # Subplot erstellen
+    fig = make_subplots(
+        rows=2, cols=1,
+        row_heights=[0.7, 0.3],
+        vertical_spacing=0.1,
+        subplot_titles=(f'<b>Grundwasserneubildung - {gwk}</b>', '<b>Niederschlag & ETp</b>' if show_precip or show_etp else ''),
+        specs=[[{"secondary_y": False}], [{"secondary_y": False}]]
+    )
+    
+    # GWN-Linie
+    fig.add_trace(
+        go.Scatter(
+            x=gwn_data['year'],
+            y=gwn_data['gwn_mm_a'],
+            mode='lines+markers',
+            name='GWN',
+            line=dict(color='steelblue', width=2),
+            marker=dict(size=4),
+            hovertemplate='<b>Jahr:</b> %{x}<br><b>GWN:</b> %{y:.1f} mm/a<extra></extra>'
+        ),
+        row=1, col=1
+    )
+    
+    # Referenzperioden-Mittelwert
+    fig.add_hline(
+        y=gwn_ref,
+        line_dash="dash",
+        line_color="green",
+        annotation_text=f"Ø 1961-1990: {gwn_ref:.1f} mm/a",
+        annotation_position="left",
+        row=1, col=1
+    )
+    
+    # Historische Periode Mittelwert
+    fig.add_hline(
+        y=gwn_hist,
+        line_dash="dash",
+        line_color="red",
+        annotation_text=f"Ø 1991-2020: {gwn_hist:.1f} mm/a",
+        annotation_position="right",
+        row=1, col=1
+    )
+    
+    # Niederschlag
+    if show_precip and not precip_data.empty:
+        fig.add_trace(
+            go.Bar(
+                x=precip_data['year'],
+                y=precip_data['value'],
+                name='Niederschlag',
+                marker_color='darkblue',
+                opacity=0.6,
+                hovertemplate='<b>Jahr:</b> %{x}<br><b>P:</b> %{y:.1f} mm/a<extra></extra>'
+            ),
+            row=2, col=1
+        )
+    
+    # ETp
+    if show_etp and not etp_data.empty:
+        fig.add_trace(
+            go.Bar(
+                x=etp_data['year'],
+                y=etp_data['value'],
+                name='ETp',
+                marker_color='orangered',
+                opacity=0.6,
+                hovertemplate='<b>Jahr:</b> %{x}<br><b>ETp:</b> %{y:.1f} mm/a<extra></extra>'
+            ),
+            row=2, col=1
+        )
+    
+    # Layout
+    fig.update_xaxes(title_text="Jahr", row=2, col=1)
+    fig.update_yaxes(title_text="GWN [mm/a]", row=1, col=1)
+    fig.update_yaxes(title_text="[mm/a]", row=2, col=1)
+    
+    fig.update_layout(
+        height=700,
+        hovermode='x unified',
+        template='plotly_white',
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    return fig
+
+
+def create_correlation_plot(df_gwn, df_precip, gwk):
+    """Erstellt Korrelationsplot GWN vs. Niederschlag"""
+    
+    gwn_data = df_gwn[df_gwn['GWK_ID'] == gwk][['year', 'gwn_mm_a']]
+    precip_data = df_precip[df_precip['GWK_ID'] == gwk][['year', 'value']]
+    
+    merged = pd.merge(gwn_data, precip_data, on='year', suffixes=('_gwn', '_p'))
+    
+    if merged.empty:
+        return None
+    
+    # Regression
+    x = merged['value'].values
+    y = merged['gwn_mm_a'].values
+    lr = linregress(x, y)
+    
+    # Plot
+    fig = go.Figure()
+    
+    # Scatter
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=y,
+        mode='markers',
+        name='Datenpunkte',
+        marker=dict(size=8, color='steelblue'),
+        hovertemplate='<b>P:</b> %{x:.1f} mm/a<br><b>GWN:</b> %{y:.1f} mm/a<extra></extra>'
+    ))
+    
+    # Regressionslinie
+    x_line = np.array([x.min(), x.max()])
+    y_line = lr.slope * x_line + lr.intercept
+    
+    fig.add_trace(go.Scatter(
+        x=x_line,
+        y=y_line,
+        mode='lines',
+        name='Regression',
+        line=dict(color='red', dash='dash'),
+        hovertemplate='y = %.2fx + %.2f<extra></extra>' % (lr.slope, lr.intercept)
+    ))
+    
+    # Annotation
+    fig.add_annotation(
+        x=0.05, y=0.95,
+        xref='paper', yref='paper',
+        text=f'R² = {lr.rvalue**2:.3f}<br>p = {lr.pvalue:.4f}',
+        showarrow=False,
+        bgcolor='white',
+        bordercolor='black',
+        borderwidth=1
+    )
+    
+    fig.update_layout(
+        title=f'<b>Korrelation: GWN vs. Niederschlag - {gwk}</b>',
+        xaxis_title='Niederschlag [mm/a]',
+        yaxis_title='GWN [mm/a]',
+        height=500,
+        template='plotly_white'
+    )
+    
+    return fig
+
+
+def create_comparison_barplot(comparison_df):
+    """Erstellt Vergleichsbarplot für Periodenänderungen"""
+    
+    df = comparison_df.sort_values('delta_abs')
+    
+    colors = ['red' if d < 0 else 'green' for d in df['delta_abs']]
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=df['delta_abs'],
+        y=df['GWK_ID'],
+        orientation='h',
+        marker_color=colors,
+        hovertemplate='<b>%{y}</b><br>Änderung: %{x:+.1f} mm/a<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title='<b>Änderung der GWN (1991-2020 vs. 1961-1990)</b>',
+        xaxis_title='Änderung [mm/a]',
+        yaxis_title='',
+        height=max(400, len(df) * 20),
+        template='plotly_white'
+    )
+    
+    return fig
+
 
 def create_gwk_map(gdf, comparison_df, selected_gwk=None):
-    """Erstellt interaktive Karte mit GWK und Änderungen (Original-Code)."""
+    """Erstellt interaktive Karte mit GWK und Änderungen"""
     
     if gdf is None or gdf.empty:
         return None
@@ -216,108 +603,137 @@ def create_gwk_map(gdf, comparison_df, selected_gwk=None):
 
 
 # ============================================================================
-# MESSSTELLEN-PLOT FUNKTIONEN
+# MESSSTELLEN-FUNKTIONEN (von gwn_dashboard_24062026_v3.py kopiert)
 # ============================================================================
 
-def create_messstellen_plot(mkz: str, gwk_id: str, cache_dir: str = "./cache"):
-    """Erstellt Ganglinie für Messstelle mit GWK-Kontext."""
+@st.cache_data
+def load_messstellen_data(cache_dir: str = "./cache") -> pd.DataFrame:
+    """Lädt Messstellen-Übersicht von NIWIS"""
     
-    try:
-        # Zeitreihe laden
-        df = load_mkz_timeseries(mkz=mkz, cache_dir=cache_dir)
-        
-        if df is None or df.empty:
-            return None
-        
-        # WICHTIG: Die Spalte heißt 'MESSZEITPUNKT', nicht 'Datum'
-        # Und der Wert ist 'WERT_UNTER_GELAENDE', nicht 'Wert'
-        
-        # Plot erstellen
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scatter(
-            x=df['MESSZEITPUNKT'],  # ← KORRIGIERT (war: 'Datum')
-            y=df['WERT_UNTER_GELAENDE'],  # ← KORRIGIERT (war: 'Wert')
-            mode='lines',
-            name=f'GW-Stand {mkz}',
-            line=dict(color='steelblue', width=2),
-            hovertemplate='<b>Datum:</b> %{x}<br><b>GW-Stand:</b> %{y:.2f} cm u. Gelände<extra></extra>'
-        ))
-        
-        # Mittelwert
-        mean_val = df['WERT_UNTER_GELAENDE'].mean()  # ← KORRIGIERT
-        fig.add_hline(
-            y=mean_val,
-            line_dash="dash",
-            line_color="red",
-            annotation_text=f"Ø {mean_val:.2f} cm",
-            annotation_position="right"
-        )
-        
-        fig.update_layout(
-            title=f"<b>Ganglinie Messstelle {mkz}</b> (GWK: {gwk_id})",
-            xaxis_title="Datum",
-            yaxis_title="Grundwasserstand [cm unter Gelände]",
-            hovermode='x unified',
-            height=500,
-            template='plotly_white'
-        )
-        
-        # Y-Achse umkehren (je tiefer, desto niedriger der Wasserstand)
-        fig.update_yaxes(autorange="reversed")
-        
-        return fig
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(exist_ok=True, parents=True)
     
-    except Exception as e:
-        logger.exception(f"Messstellen-Plot failed for {mkz}")
-        st.error(f"Fehler beim Erstellen des Plots für {mkz}: {e}")
-        return None
+    cache_file = cache_path / "messstellen_uebersicht.csv"
+    
+    # Cache prüfen
+    if cache_file.exists():
+        return pd.read_csv(cache_file, sep=";", encoding="utf-8", parse_dates=["Erstes_Messdatum", "Letztes_Messdatum"])
+    
+    # Von NIWIS laden
+    url = "https://www.umwelt.sachsen.de/umwelt/infosysteme/niwis/messwerte.ashx?para=gw&kat=uebersicht"
+    local_file = cache_path / "messstellen_temp.csv"
+    
+    urlretrieve(url, local_file)
+    
+    # Einlesen
+    df = pd.read_csv(local_file, sep=";", encoding="utf-8")
+    
+    # Datumspalten konvertieren
+    for col in ["Erstes_Messdatum", "Letztes_Messdatum"]:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], format="%d.%m.%Y", errors='coerce')
+    
+    # Speichern
+    df.to_csv(cache_file, sep=";", encoding="utf-8", index=False)
+    
+    return df
 
 
 @st.cache_data
-def load_gwk_geometries(shapefile_path: str):
-    """Lädt GWK-Geometrien aus Shapefile"""
+def load_mkz_timeseries(mkz: str, cache_dir: str = "./cache") -> pd.DataFrame:
+    """Lädt Zeitreihe für eine Messstelle"""
+    
+    cache_path = Path(cache_dir)
+    cache_path.mkdir(exist_ok=True, parents=True)
+    
+    cache_file = cache_path / f"mkz_{mkz}.csv"
+    
+    # Cache prüfen
+    if cache_file.exists():
+        df = pd.read_csv(cache_file, sep=";", encoding="utf-8", parse_dates=["MESSZEITPUNKT"])
+        return df
+    
+    # Von NIWIS laden
+    url = f"https://www.umwelt.sachsen.de/umwelt/infosysteme/niwis/messwerte.ashx?para=gw&kat=messwerte&mkz={mkz}"
+    local_file = cache_path / f"mkz_{mkz}_temp.csv"
+    
     try:
-        gdf = gpd.read_file(shapefile_path)
+        urlretrieve(url, local_file)
         
-        # Koordinatensystem prüfen und ggf. nach WGS84 transformieren
-        if gdf.crs is not None and gdf.crs.to_epsg() != 4326:
-            gdf = gdf.to_crs(epsg=4326)
+        # Einlesen
+        df = pd.read_csv(local_file, sep=";", encoding="utf-8")
         
-        # Spalte 'desc' als GWK_ID verwenden
-        if 'desc' in gdf.columns:
-            gdf['GWK_ID'] = gdf['desc'].astype(str).str.strip()
+        # Datum konvertieren
+        if "MESSZEITPUNKT" in df.columns:
+            df["MESSZEITPUNKT"] = pd.to_datetime(df["MESSZEITPUNKT"], format="%d.%m.%Y", errors='coerce')
         
-        return gdf
+        # Speichern
+        df.to_csv(cache_file, sep=";", encoding="utf-8", index=False)
+        
+        return df
+    
     except Exception as e:
-        st.error(f"Fehler beim Laden der Shapefile: {e}")
-        return None
+        logger.error(f"Fehler beim Laden von MKZ {mkz}: {e}")
+        return pd.DataFrame()
 
 
-def get_messstellen_for_gwk(gwk_id: str, messstellen_df: pd.DataFrame) -> list[str]:
-    """Findet Messstellen für ein GWK."""
+def compute_mkz_trend(mkz: str, trend_ab: date, trend_bis: date, cache_dir: str = "./cache") -> dict:
+    """Berechnet Grimm-Strele Trend für Messstelle"""
     
-    if messstellen_df is None or messstellen_df.empty:
-        return []
+    df = load_mkz_timeseries(mkz, cache_dir)
     
-    # Filter nach GWK25 (NICHT GWK_ID!)
-    if 'GWK25' in messstellen_df.columns:
-        mkz_list = messstellen_df[messstellen_df['GWK25'] == gwk_id]['MKZ'].dropna().unique().tolist()
-    elif 'GWK' in messstellen_df.columns:
-        # Fallback auf GWK-Spalte
-        mkz_list = messstellen_df[messstellen_df['GWK'] == gwk_id]['MKZ'].dropna().unique().tolist()
+    if df.empty:
+        return {"error": "Keine Daten verfügbar"}
+    
+    # Zeitraum filtern
+    df_trend = df[
+        (df["MESSZEITPUNKT"] >= pd.to_datetime(trend_ab)) &
+        (df["MESSZEITPUNKT"] <= pd.to_datetime(trend_bis))
+    ].copy()
+    
+    if len(df_trend) < 2:
+        return {"error": "Zu wenige Datenpunkte im Zeitraum"}
+    
+    # Monatsmittel
+    df_monthly = df_trend.set_index("MESSZEITPUNKT")["WERT_UNTER_GELAENDE"].resample("MS").mean().dropna()
+    
+    if len(df_monthly) < 2:
+        return {"error": "Zu wenige Monatsmittel"}
+    
+    # Lineare Regression
+    x = (df_monthly.index - df_monthly.index[0]).days.values.reshape(-1, 1) / 365.0
+    y = df_monthly.values
+    
+    model = linear_model.LinearRegression().fit(x, y)
+    anstieg_cm_a = model.coef_[0]
+    
+    # Grimm-Strele
+    mittelwert = y.mean()
+    spanne = y.max() - y.min()
+    grimm_strele = (anstieg_cm_a / mittelwert) * 100 if mittelwert != 0 else 0
+    
+    # Trendklassifikation
+    if grimm_strele <= -1:
+        trend = "Fallend"
+    elif grimm_strele > 1:
+        trend = "Steigend"
     else:
-        # Fallback: Name-Matching
-        mkz_list = messstellen_df['MKZ'].dropna().unique().tolist()
-        # Filtere nach Präfix (z.B. "DESN_EL" in MKZ-Namen)
-        prefix = gwk_id.split('-')[0] if '-' in gwk_id else gwk_id[:8]
-        mkz_list = [mkz for mkz in mkz_list if prefix in str(mkz)]
+        trend = "Stabil"
     
-    return mkz_list[:10]  # Max 10 Messstellen
+    return {
+        "MKZ": mkz,
+        "Trend von": trend_ab.strftime("%Y-%m-%d"),
+        "Trend bis": trend_bis.strftime("%Y-%m-%d"),
+        "Anzahl Werte": len(df_trend),
+        "Anstieg [cm/a]": anstieg_cm_a,
+        "Grimm-Strele [%/a]": grimm_strele,
+        "Spanne [cm]": spanne,
+        "Trend": trend
+    }
 
 
 # ============================================================================
-# DEMO DATA & HELPERS
+# HELPER FUNCTIONS
 # ============================================================================
 
 def _load_demo_gwk() -> list[str]:
@@ -734,18 +1150,9 @@ def page_timeseries() -> None:
     
     # ── Messstellen-Sektion ──
     st.divider()
-    st.subheader("💧 Grundwasser-Messstellen")
+    st.subheader("💧 Grundwasser-Messstellen im GWK")
     
-    with st.expander("ℹ️ Messstellen-Daten", expanded=False):
-        st.markdown(
-            """
-            **Hinweis:** Messstellen-Daten werden von NIWIS (Niedrigwasser-Informationssystem Sachsen) 
-            nachgeladen. Der erste Aufruf kann 1-2 Minuten dauern.
-            
-            Die Daten werden lokal gecacht für schnelleren Zugriff.
-            """
-        )
-    
+    # Cache-Verzeichnis für Messstellen
     cache_dir = st.text_input(
         "Cache-Verzeichnis:",
         value="./cache",
@@ -753,78 +1160,75 @@ def page_timeseries() -> None:
         key="cache_dir_ts"
     )
     
-    if st.button("🔄 Messstellen für GWK laden", type="primary"):
-        with st.spinner(f"Lade Messstellen für {selected_gwk}..."):
-            try:
-                # Alle Messstellen laden
-                messstellen = load_messstellen_data(cache_dir=cache_dir)
-                
-                # Messstellen für GWK filtern
-                mkz_list = get_messstellen_for_gwk(selected_gwk, messstellen)
-                
-                if not mkz_list:
-                    st.warning(f"⚠️ Keine Messstellen für {selected_gwk} gefunden")
-                else:
-                    st.success(f"✅ {len(mkz_list)} Messstellen gefunden")
-                    
-                    # Messstelle auswählen
-                    selected_mkz = st.selectbox(
-                        "Messstelle auswählen:",
-                        mkz_list,
-                        key="mkz_select_ts"
-                    )
-                    
-                    # Ganglinie plotten
-                    fig_mkz = create_messstellen_plot(
-                        mkz=selected_mkz,
-                        gwk_id=selected_gwk,
-                        cache_dir=cache_dir
-                    )
-                    
-                    if fig_mkz:
-                        st.plotly_chart(fig_mkz, use_container_width=True)
-                        
-                        # Trend-Optionen
-                        with st.expander("📐 Trend berechnen (Grimm-Strele)"):
-                            col1, col2 = st.columns(2)
-                            trend_start = col1.date_input(
-                                "Trend von:",
-                                value=pd.to_datetime("2000-01-01"),
-                                key="trend_start_ts"
-                            )
-                            trend_end = col2.date_input(
-                                "Trend bis:",
-                                value=pd.to_datetime("2023-12-31"),
-                                key="trend_end_ts"
-                            )
-                            
-                            if st.button("Trend berechnen", key="calc_trend_ts"):
-                                with st.spinner("Berechne Trend..."):
-                                    result = compute_mkz_trend(
-                                        mkz=selected_mkz,
-                                        trend_ab=trend_start,
-                                        trend_bis=trend_end,
-                                        cache_dir=cache_dir,
-                                    )
-                                    
-                                    if "error" in result:
-                                        st.error(f"Fehler: {result['error']}")
-                                    else:
-                                        col1, col2, col3 = st.columns(3)
-                                        col1.metric("Anstieg", f"{result['Anstieg [cm/a]']:.2f} cm/a")
-                                        col2.metric("Grimm-Strele", f"{result['Grimm-Strele [%/a]']:.2f} %/a")
-                                        col3.metric("Trend", result["Trend"])
-                                        
-                                        st.info(
-                                            f"**Anzahl Werte:** {result['Anzahl Werte']}\n\n"
-                                            f"**Spanne:** {result['Spanne [cm]']:.1f} cm"
-                                        )
-                    else:
-                        st.warning("Keine Zeitreihe für diese Messstelle verfügbar")
+    try:
+        messstellen = load_messstellen_data(cache_dir=cache_dir)
+        messstellen_gwk = messstellen[messstellen['GWK25'] == selected_gwk]
+        
+        if len(messstellen_gwk) == 0:
+            st.info(f"ℹ️ Keine Messstellen für {selected_gwk} verfügbar.")
+        else:
+            st.success(f"✅ {len(messstellen_gwk)} Messstellen gefunden für {selected_gwk}")
             
-            except Exception as e:
-                st.error(f"❌ Fehler beim Laden der Messstellen:\n\n```\n{e}\n```")
-                logger.exception("Messstellen loading failed")
+            # MKZ MULTISELECT
+            available_mkz = sorted(messstellen_gwk['MKZ'].tolist())
+            
+            selected_mkz_list = st.multiselect(
+                "Wähle Messstellen aus (Mehrfachauswahl):",
+                options=available_mkz,
+                default=available_mkz[:min(5, len(available_mkz))],
+                help="Mehrfachauswahl mit Strg/Cmd + Klick",
+                key="mkz_select_ts"
+            )
+            
+            # Zeitreihen für ausgewählte Messstellen plotten
+            for mkz in selected_mkz_list:
+                fig_mkz = create_messstellen_plot(
+                    mkz=mkz,
+                    gwk_id=selected_gwk,
+                    cache_dir=cache_dir
+                )
+                
+                if fig_mkz:
+                    st.plotly_chart(fig_mkz, use_container_width=True)
+            
+            # Trend-Optionen
+            with st.expander("📐 Trend berechnen (Grimm-Strele)"):
+                col1, col2 = st.columns(2)
+                trend_start = col1.date_input(
+                    "Trend von:",
+                    value=pd.to_datetime("2000-01-01"),
+                    key="trend_start_ts"
+                )
+                trend_end = col2.date_input(
+                    "Trend bis:",
+                    value=pd.to_datetime("2023-12-31"),
+                    key="trend_end_ts"
+                )
+                
+                if st.button("Trend berechnen", key="calc_trend_ts"):
+                    with st.spinner("Berechne Trend..."):
+                        result = compute_mkz_trend(
+                            mkz=selected_mkz,
+                            trend_ab=trend_start,
+                            trend_bis=trend_end,
+                            cache_dir=cache_dir,
+                        )
+                        
+                        if "error" in result:
+                            st.error(f"Fehler: {result['error']}")
+                        else:
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("Anstieg", f"{result['Anstieg [cm/a]']:.2f} cm/a")
+                            col2.metric("Grimm-Strele", f"{result['Grimm-Strele [%/a]']:.2f} %/a")
+                            col3.metric("Trend", result["Trend"])
+                            
+                            st.info(
+                                f"**Anzahl Werte:** {result['Anzahl Werte']}\n\n"
+                                f"**Spanne:** {result['Spanne [cm]']:.1f} cm"
+                            )
+    except Exception as e:
+        st.error(f"❌ Fehler beim Laden der Messstellen:\n\n```\n{e}\n```")
+        logger.exception("Messstellen loading failed")
 
 
 # ============================================================================
