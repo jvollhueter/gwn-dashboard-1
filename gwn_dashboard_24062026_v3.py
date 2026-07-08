@@ -606,11 +606,22 @@ def create_gwk_map(gdf, comparison_df, selected_gwk=None):
     return fig
 
 
-def create_simple_gwk_map(gdf, comparison_df, selected_gwk=None):
-    """Erstellt einfachere Karte mit Plotly (funktioniert besser bei vielen GWK)"""
+def create_simple_gwk_map(gdf, comparison_df, selected_gwk=None, thresholds=None):
+    """Erstellt einfachere Karte mit Plotly (funktioniert besser bei vielen GWK)
+    
+    Args:
+        gdf: GeoDataFrame mit Geometrien
+        comparison_df: DataFrame mit Vergleichsdaten
+        selected_gwk: Ausgewähltes GWK zum Highlighten
+        thresholds: Dict mit Schwellenwerten {'t1': -20, 't2': -10, 't3': 0, 't4': 10, 't5': 20}
+    """
     
     if gdf is None or gdf.empty:
         return None
+    
+    # Standard-Schwellenwerte falls nicht angegeben
+    if thresholds is None:
+        thresholds = {'t1': -20, 't2': -10, 't3': 0, 't4': 10, 't5': 20}
     
     # Merge mit Vergleichsdaten
     gdf_merged = gdf.merge(comparison_df, on='GWK_ID', how='left')
@@ -637,17 +648,17 @@ def create_simple_gwk_map(gdf, comparison_df, selected_gwk=None):
     
     # Für jedes GWK eine Trace
     for idx, row in gdf_merged.iterrows():
-        # Farbe basierend auf Änderung
+        # Farbe basierend auf Änderung (dynamische Schwellenwerte)
         if pd.notna(row['delta_abs']):
-            if row['delta_abs'] < -20:
+            if row['delta_abs'] < thresholds['t1']:
                 color = 'darkred'
-            elif row['delta_abs'] < -10:
+            elif row['delta_abs'] < thresholds['t2']:
                 color = 'red'
-            elif row['delta_abs'] < 0:
+            elif row['delta_abs'] < thresholds['t3']:
                 color = 'orange'
-            elif row['delta_abs'] < 10:
+            elif row['delta_abs'] < thresholds['t4']:
                 color = 'lightgreen'
-            elif row['delta_abs'] < 20:
+            elif row['delta_abs'] < thresholds['t5']:
                 color = 'green'
             else:
                 color = 'darkgreen'
@@ -707,7 +718,7 @@ def create_simple_gwk_map(gdf, comparison_df, selected_gwk=None):
     
     return fig
 # ============================================================================
-# MESSSTELLEN-FUNKTIONEN (von Kollege integriert)
+# MESSSTELLEN-FUNKTIONEN
 # ============================================================================
 
 from urllib.request import urlretrieve
@@ -1461,6 +1472,61 @@ def main():
                 
                 show_labels = st.checkbox("GWK-Namen anzeigen", value=False)
                 
+                # Schwellenwerte für Einfache Polygone
+                thresholds = None
+                if map_type == "Einfache Polygone":
+                    st.markdown("---")
+                    st.subheader("⚙️ Farbklassen-Schwellenwerte")
+                    st.caption("Schwellenwerte für GWN-Änderung [mm/a]")
+                    
+                    with st.expander("🎨 Schwellenwerte anpassen", expanded=False):
+                        col_t1, col_t2 = st.columns(2)
+                        
+                        with col_t1:
+                            t1 = st.number_input(
+                                "Schwelle 1 (dunkelrot < x):",
+                                value=-20.0,
+                                step=5.0,
+                                help="Werte kleiner als dieser Schwellenwert = dunkelrot"
+                            )
+                            
+                            t2 = st.number_input(
+                                "Schwelle 2 (rot):",
+                                value=-10.0,
+                                step=5.0,
+                                help="Zwischen Schwelle 1 und 2 = rot"
+                            )
+                            
+                            t3 = st.number_input(
+                                "Schwelle 3 (orange):",
+                                value=0.0,
+                                step=5.0,
+                                help="Zwischen Schwelle 2 und 3 = orange"
+                            )
+                        
+                        with col_t2:
+                            t4 = st.number_input(
+                                "Schwelle 4 (hellgrün):",
+                                value=10.0,
+                                step=5.0,
+                                help="Zwischen Schwelle 3 und 4 = hellgrün"
+                            )
+                            
+                            t5 = st.number_input(
+                                "Schwelle 5 (grün):",
+                                value=20.0,
+                                step=5.0,
+                                help="Zwischen Schwelle 4 und 5 = grün"
+                            )
+                            
+                            st.caption("Werte > Schwelle 5 = dunkelgrün")
+                        
+                        # Validierung
+                        if not (t1 < t2 < t3 < t4 < t5):
+                            st.error("⚠️ Schwellenwerte müssen aufsteigend sein: t1 < t2 < t3 < t4 < t5")
+                        
+                        thresholds = {'t1': t1, 't2': t2, 't3': t3, 't4': t4, 't5': t5}
+                
                 st.markdown("---")
                 
                 # NEUE MESSSTELLEN-FUNKTIONALITÄT
@@ -1514,7 +1580,7 @@ def main():
                 if map_type == "Choropleth (Farbe nach Änderung)":
                     fig_map = create_gwk_map(gdf, data['comparison'], selected_gwk)
                 else:
-                    fig_map = create_simple_gwk_map(gdf, data['comparison'], selected_gwk)
+                    fig_map = create_simple_gwk_map(gdf, data['comparison'], selected_gwk, thresholds)
                 
                 if fig_map is not None:
                     
@@ -1567,31 +1633,60 @@ def main():
                 else:
                     st.error("Karte konnte nicht erstellt werden")
             
-            # Legende
+            # Legende (dynamisch basierend auf Kartentyp und Schwellenwerten)
             st.markdown("---")
             st.subheader("📊 Farbskala GWK")
             
-            col1, col2, col3, col4, col5 = st.columns(5)
-            
-            with col1:
-                st.markdown("🟥 **< -20 mm/a**")
-                st.caption("Starker Rückgang")
-            
-            with col2:
-                st.markdown("🟧 **-20 bis -10**")
-                st.caption("Rückgang")
-            
-            with col3:
-                st.markdown("🟨 **-10 bis 0**")
-                st.caption("Leichter Rückgang")
-            
-            with col4:
-                st.markdown("🟩 **0 bis +10**")
-                st.caption("Leichte Zunahme")
-            
-            with col5:
-                st.markdown("🟢 **> +10 mm/a**")
-                st.caption("Starke Zunahme")
+            if map_type == "Einfache Polygone" and thresholds is not None:
+                # Dynamische Legende basierend auf benutzerdefinierten Schwellenwerten
+                col1, col2, col3, col4, col5, col6 = st.columns(6)
+                
+                with col1:
+                    st.markdown(f"🟥 **< {thresholds['t1']:.0f}**")
+                    st.caption("Starker Rückgang")
+                
+                with col2:
+                    st.markdown(f"🔴 **{thresholds['t1']:.0f} bis {thresholds['t2']:.0f}**")
+                    st.caption("Rückgang")
+                
+                with col3:
+                    st.markdown(f"🟠 **{thresholds['t2']:.0f} bis {thresholds['t3']:.0f}**")
+                    st.caption("Leichter Rückgang")
+                
+                with col4:
+                    st.markdown(f"🟢 **{thresholds['t3']:.0f} bis {thresholds['t4']:.0f}**")
+                    st.caption("Leichte Zunahme")
+                
+                with col5:
+                    st.markdown(f"🟩 **{thresholds['t4']:.0f} bis {thresholds['t5']:.0f}**")
+                    st.caption("Zunahme")
+                
+                with col6:
+                    st.markdown(f"🌟 **> {thresholds['t5']:.0f}**")
+                    st.caption("Starke Zunahme")
+            else:
+                # Standard-Legende für Choropleth
+                col1, col2, col3, col4, col5 = st.columns(5)
+                
+                with col1:
+                    st.markdown("🟥 **< -20 mm/a**")
+                    st.caption("Starker Rückgang")
+                
+                with col2:
+                    st.markdown("🟧 **-20 bis -10**")
+                    st.caption("Rückgang")
+                
+                with col3:
+                    st.markdown("🟨 **-10 bis 0**")
+                    st.caption("Leichter Rückgang")
+                
+                with col4:
+                    st.markdown("🟩 **0 bis +10**")
+                    st.caption("Leichte Zunahme")
+                
+                with col5:
+                    st.markdown("🟢 **> +10 mm/a**")
+                    st.caption("Starke Zunahme")
             
             if show_messstellen:
                 st.markdown("---")
