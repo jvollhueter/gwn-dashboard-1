@@ -1,3 +1,7 @@
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-ra"
 testpaths = ["tests"]
+markers = [
+    "integration: tests that combine multiple application layers",
+    "smoke: basic package and application import tests",
+]

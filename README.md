@@ -27,6 +27,34 @@ streamlit run app.py
 
 `app.py` ist der einzige Einstiegspunkt der Anwendung.
 
+## Tests
+
+Die Entwicklungsabhängigkeiten einschließlich `pytest` werden mit folgendem Befehl installiert:
+
+```bash
+python -m pip install -r requirements-dev.txt
+```
+
+Alle Tests ausführen:
+
+```bash
+python -m pytest -v
+```
+
+Nur Unit-Tests ausführen:
+
+```bash
+python -m pytest tests/unit -v
+```
+
+Nur den Service-Integrationstest ausführen:
+
+```bash
+python -m pytest -m integration -v
+```
+
+Die aktuelle Basissuite prüft Periodenmodelle, zeitliche Aggregation, die komponentenweise GWN-Berechnung aus `rg1` und `rg2`, Mapping und GWK-Filterung, Perioden- und Trendstatistiken, Periodenvergleiche sowie den vollständigen Service-Datenfluss mit einem kurzen synthetischen Datensatz. Fachlich noch nicht abschließend festgelegte Regeln zu unvollständigen Jahren, fehlenden GWN-Komponenten und zur räumlichen Gewichtung werden bewusst noch nicht als erwartetes Verhalten festgeschrieben.
+
 ## Projektstruktur
 
 ```text
@@ -44,6 +72,9 @@ src/gwn_dashboard/
     components/
     pages/
 tests/
+  unit/
+  integration/
+  smoke/
 ```
 
 Die Architektur trennt fachliche Modelle, Datenzugriff, Berechnungen, Visualisierung und Streamlit-Oberfläche. Die GUI greift ausschließlich über den `DashboardService` auf die Datenverarbeitung zu.
