@@ -1,0 +1,36 @@
+application:
+  title: "Grundwasserneubildung – Interaktive Analyse"
+  page_title: "GWN Analyse Dashboard"
+  page_icon: "💧"
+  layout: "wide"
+  initial_sidebar_state: "expanded"
+
+data:
+  base_directory: "data/kalib_beo_ERA5"
+  mapping_file: "data/kalib_beo_ERA5/GWK_2025/GWK_2025.csv"
+  geometry_file: "data/kalib_beo_ERA5/GWK_2025/GWK_2025.shp"
+
+periods:
+  reference:
+    label: "1961–1990"
+    start_year: 1961
+    end_year: 1990
+  comparison:
+    label: "1991–2020"
+    start_year: 1991
+    end_year: 2020
+
+parameters:
+  groundwater_recharge:
+    code: "gwn"
+    label: "Grundwasserneubildung"
+    unit: "mm/a"
+    source_codes: ["rg1", "rg2"]
+  precipitation:
+    code: "P"
+    label: "Niederschlag"
+    unit: "mm/a"
+  potential_evapotranspiration:
+    code: "ETp"
+    label: "Potenzielle Evapotranspiration"
+    unit: "mm/a"

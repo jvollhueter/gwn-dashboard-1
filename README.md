@@ -1,28 +1,49 @@
-# 💧 GWN Dashboard - Grundwasserneubildung Sachsen
+# 💧 GWN Dashboard – Grundwasserneubildung Sachsen
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://gwn-dashboard.streamlit.app)
+Interaktives Streamlit-Dashboard zur Analyse der Grundwasserneubildung in sächsischen Grundwasserkörpern.
 
-Interaktives Dashboard zur Analyse der Grundwasserneubildung (GWN) in Sachsen für die Zeiträume 1961-1990 und 1991-2020.
+## Funktionen
 
-## 🚀 Live Demo
+- Zeitreihenanalyse der Grundwasserneubildung
+- Vergleich der Perioden 1961–1990 und 1991–2020
+- Korrelationsdarstellung mit Niederschlag
+- Trendstatistiken
+- interaktive GWK-Karte
+- CSV- und Excel-Export
 
-➡️ **[Dashboard öffnen](https://gwn-dashboard.streamlit.app)**
-
-## 📊 Features
-
-- 📈 Zeitreihenanalyse (1961-2020)
-- 🔄 Korrelation mit Niederschlag und ETp
-- 📊 Periodenvergleich (1961-1990 vs. 1991-2020)
-- 🗺️ Interaktive Karte mit GWK-Geometrien
-- 🎯 Flexible GWK-Auswahl (alle verfügbaren GWK)
-- 📥 CSV/Excel Export
-
-## 💻 Lokale Installation
+## Installation
 
 ```bash
-# Repository herunterladen (ZIP oder Git)
-# Python-Pakete installieren
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
+```
 
-# App starten
-streamlit run gwn_dashboard.py
+## Start
+
+```bash
+streamlit run app.py
+```
+
+`app.py` ist der einzige Einstiegspunkt der Anwendung.
+
+## Projektstruktur
+
+```text
+app.py
+config/
+  app_config.yaml
+src/gwn_dashboard/
+  application.py
+  config.py
+  domain/
+  repositories/
+  services/
+  visualization/
+  ui/
+    components/
+    pages/
+tests/
+```
+
+Die Architektur trennt fachliche Modelle, Datenzugriff, Berechnungen, Visualisierung und Streamlit-Oberfläche. Die GUI greift ausschließlich über den `DashboardService` auf die Datenverarbeitung zu.
