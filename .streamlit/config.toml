@@ -1,10 +1,8 @@
 [theme]
-# Core palette derived from the supplied GWN viewer screenshot.
-# Keep these values synchronized with src/gwn_dashboard/design/theme.py.
 primaryColor = "#337E33"
 backgroundColor = "#F0F0F0"
 secondaryBackgroundColor = "#FFFFFF"
-textColor = "#3C3C3C"
+textColor = "#56626E"
 font = "sans serif"
 
 [browser]

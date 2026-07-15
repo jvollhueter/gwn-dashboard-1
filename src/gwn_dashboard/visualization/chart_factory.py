@@ -41,8 +41,8 @@ class ChartFactory:
                 y=recharge["gwn_mm_a"],
                 name="Grundwasserneubildung",
                 mode="lines+markers",
-                line={"color": COLORS.groundwater, "width": 3},
-                marker={"color": COLORS.groundwater, "size": 5},
+                line={"color": COLORS.groundwater, "width": 1.6},
+                marker={"color": COLORS.groundwater, "size": 6, "symbol": "circle"},
             ),
             secondary_y=False,
         )
@@ -80,8 +80,9 @@ class ChartFactory:
                     x=precipitation["year"],
                     y=precipitation["value"],
                     name="Niederschlag",
-                    mode="lines",
-                    line={"color": COLORS.precipitation, "dash": "dot"},
+                    mode="lines+markers",
+                    line={"color": COLORS.precipitation, "width": 1.5},
+                    marker={"color": COLORS.precipitation, "size": 5, "symbol": "square"},
                 ),
                 secondary_y=True,
             )
@@ -92,11 +93,12 @@ class ChartFactory:
                     x=etp["year"],
                     y=etp["value"],
                     name="Potenzielle Evapotranspiration",
-                    mode="lines",
+                    mode="lines+markers",
                     line={
                         "color": COLORS.evapotranspiration,
-                        "dash": "dash",
+                        "width": 1.5,
                     },
+                    marker={"color": COLORS.evapotranspiration, "size": 5, "symbol": "diamond"},
                 ),
                 secondary_y=True,
             )
@@ -195,6 +197,29 @@ class ChartFactory:
             figure,
             title="Verteilung der GWN-Änderungen",
             height=400,
+        )
+
+
+    def create_value_histogram(
+        self,
+        data: pd.DataFrame,
+        value_column: str,
+        title: str,
+    ) -> go.Figure:
+        """Create a compact histogram for the viewer's map statistics panel."""
+
+        figure = px.histogram(
+            data.dropna(subset=[value_column]),
+            x=value_column,
+            nbins=8,
+            labels={value_column: title},
+            color_discrete_sequence=[COLORS.brand_primary],
+        )
+        figure.update_layout(showlegend=False)
+        return apply_dashboard_layout(
+            figure,
+            title="",
+            height=260,
         )
 
     def create_period_boxplot(self, comparison: pd.DataFrame) -> go.Figure:

@@ -1,9 +1,9 @@
 application:
-  title: "Grundwasserneubildung – Interaktive Analyse"
-  page_title: "GWN Analyse Dashboard"
+  title: "GWN Viewer"
+  page_title: "GWN Viewer Sachsen"
   page_icon: "💧"
   layout: "wide"
-  initial_sidebar_state: "expanded"
+  initial_sidebar_state: "collapsed"
 
 data:
   base_directory: "data/kalib_beo_ERA5"

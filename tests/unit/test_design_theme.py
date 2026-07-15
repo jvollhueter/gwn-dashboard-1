@@ -152,4 +152,144 @@ def test_core_palette_matches_supplied_gwn_viewer_reference() -> None:
     assert COLORS.surface == "#FFFFFF"
     assert COLORS.border == "#CED4DA"
     assert COLORS.groundwater == "#007BFF"
+    assert COLORS.precipitation == "#F45B5B"
     assert COLORS.evapotranspiration == "#F45B5B"
+
+
+def test_viewer_layout_css_contains_landing_header_and_footer_navigation() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    styles = (
+        project_root / "src" / "gwn_dashboard" / "design" / "styles.css"
+    ).read_text(encoding="utf-8")
+
+    assert ".viewer-header" in styles
+    assert ".viewer-landing" in styles
+    assert ".viewer-landing-card" in styles
+    assert ".viewer-bottom-nav" in styles
+    assert "position: fixed" in styles
+    assert "background: var(--viewer-green)" in styles
+
+
+def test_application_routes_landing_and_all_viewer_modules() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    application = (
+        project_root / "src" / "gwn_dashboard" / "ui" / "application.py"
+    ).read_text(encoding="utf-8")
+
+    landing_position = application.index("if route == START.key")
+    context_position = application.index("self._context = _create_cached_context")
+
+    assert landing_position < context_position
+    assert "LandingPage(" in application
+    assert "MapPage(" in application
+    assert "DiagramPage(" in application
+    assert "NomogramPage(" in application
+    assert "ExportPage(" in application
+    assert "InformationPage().render()" in application
+
+
+def test_landing_background_asset_is_included() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    background = (
+        project_root
+        / "src"
+        / "gwn_dashboard"
+        / "ui"
+        / "assets"
+        / "landing_background.jpg"
+    )
+
+    assert background.exists()
+    assert background.stat().st_size > 10_000
+
+
+
+def test_header_contains_only_home_service_link_and_internal_platform_title() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    header = (
+        project_root
+        / "src"
+        / "gwn_dashboard"
+        / "ui"
+        / "components"
+        / "app_header.py"
+    ).read_text(encoding="utf-8")
+
+    assert "Interne Plattform Referat 43" in header
+    assert "viewer-brand-mark" not in header
+    assert header.count('<a href="?view=start"') == 1
+    assert "Kontakt" not in header
+    assert "Impressum" not in header
+    assert "Datenschutzerklärung" not in header
+    assert "Sitzung beenden" not in header
+
+
+def test_decorative_pseudo_menus_are_not_present() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    ui_source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (project_root / "src" / "gwn_dashboard" / "ui").rglob("*.py")
+    )
+    styles = (
+        project_root / "src" / "gwn_dashboard" / "design" / "styles.css"
+    ).read_text(encoding="utf-8")
+
+    assert "viewer-map-toolbar" not in ui_source
+    assert "viewer-toolbar-arrow" not in ui_source
+    assert "viewer-module-selector" not in ui_source
+    assert "viewer-brand-mark" not in styles
+
+
+def test_timeseries_preserves_both_optional_meteorological_series() -> None:
+    figure = ChartFactory(_test_config()).create_timeseries(
+        _test_dashboard_data(),
+        groundwater_body="GWK_A",
+        show_precipitation=True,
+        show_evapotranspiration=True,
+    )
+    names = {trace.name for trace in figure.data}
+
+    assert "Grundwasserneubildung" in names
+    assert "Niederschlag" in names
+    assert "Potenzielle Evapotranspiration" in names
+    assert any("2000–2001" in name for name in names)
+    assert any("2002–2003" in name for name in names)
+
+
+def test_map_page_preserves_period_boxplot_and_uses_real_plotly_toolbar() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    map_page = (
+        project_root
+        / "src"
+        / "gwn_dashboard"
+        / "ui"
+        / "pages"
+        / "map_page.py"
+    ).read_text(encoding="utf-8")
+
+    assert "create_period_boxplot" in map_page
+    assert '"displayModeBar": True' in map_page
+    assert "viewer-map-toolbar" not in map_page
+
+
+def test_landing_page_icon_assets_are_included() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    icon_directory = (
+        project_root
+        / "src"
+        / "gwn_dashboard"
+        / "ui"
+        / "assets"
+        / "icons"
+    )
+
+    expected_icons = {
+        "karte.png",
+        "liniendiagramm.png",
+        "korrelation.png",
+        "import-export.png",
+    }
+
+    assert {path.name for path in icon_directory.glob("*.png")} == expected_icons
+    for icon_path in icon_directory.glob("*.png"):
+        assert icon_path.stat().st_size > 1_000
