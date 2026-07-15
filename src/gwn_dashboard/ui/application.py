@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 
 import streamlit as st
 
 from gwn_dashboard.application import AppContext, create_app_context
 from gwn_dashboard.config import DashboardConfig, load_config
+from gwn_dashboard.design.style_loader import load_global_styles
 from gwn_dashboard.domain.models import DashboardData
 from gwn_dashboard.ui.components.export_panel import ExportPanel
 from gwn_dashboard.ui.components.metric_panel import MetricPanel
@@ -46,8 +48,11 @@ class StreamlitApplication:
     def run(self) -> None:
         self._configure_page()
         self._context = _create_cached_context(str(self._project_root))
-        st.title(f"💧 {self._config.application.title}")
-        st.markdown("---")
+        title = escape(self._config.application.title)
+        st.markdown(
+            f'<div class="app-title-bar"><h1>💧 {title}</h1></div>',
+            unsafe_allow_html=True,
+        )
 
         try:
             available = self._context.dashboard_service.get_available_groundwater_bodies()
@@ -91,15 +96,7 @@ class StreamlitApplication:
             layout=app.layout,
             initial_sidebar_state=app.initial_sidebar_state,
         )
-        st.markdown(
-            """
-            <style>
-            .main { padding: 0rem 1rem; }
-            .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 5px; }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
+        load_global_styles()
 
     @staticmethod
     def _show_fatal_error(message: str, error: Exception) -> None:

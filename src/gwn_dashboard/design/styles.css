@@ -1,0 +1,170 @@
+:root {
+    /* Palette derived from the supplied GWN viewer screenshot. */
+    --brand-primary: #337E33;
+    --brand-primary-dark: #28652A;
+    --brand-primary-light: #E8F3E8;
+    --text-on-brand: #FFFFFF;
+
+    --background: #F0F0F0;
+    --surface: #FFFFFF;
+    --border: #CED4DA;
+    --grid: #E6E6E6;
+
+    --text: #3C3C3C;
+    --text-muted: #6C757D;
+
+    --groundwater: #007BFF;
+    --decrease: #F45B5B;
+}
+
+/* Application background and native Streamlit header */
+[data-testid="stAppViewContainer"] {
+    background-color: var(--background);
+}
+
+[data-testid="stHeader"] {
+    background-color: var(--brand-primary);
+    border-bottom: 1px solid var(--brand-primary-dark);
+}
+
+[data-testid="stToolbar"] {
+    color: var(--text-on-brand);
+}
+
+/* Main content area */
+[data-testid="stMainBlockContainer"] {
+    max-width: 1500px;
+    padding-top: 1.25rem;
+    padding-bottom: 3rem;
+}
+
+/* Dark-green application title bar; content and position remain unchanged. */
+.app-title-bar {
+    background-color: var(--brand-primary);
+    border: 1px solid var(--brand-primary-dark);
+    padding: 0.9rem 1.2rem;
+    margin-bottom: 1rem;
+}
+
+.app-title-bar h1 {
+    color: var(--text-on-brand);
+    font-size: 2rem;
+    font-weight: 650;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background-color: var(--surface);
+    border-right: 1px solid var(--border);
+}
+
+[data-testid="stSidebar"] h1,
+[data-testid="stSidebar"] h2,
+[data-testid="stSidebar"] h3 {
+    color: var(--brand-primary);
+}
+
+/* Headings */
+h1,
+h2,
+h3 {
+    color: var(--text);
+}
+
+h1 {
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+/* Metric cards */
+[data-testid="stMetric"] {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-top: 5px solid var(--brand-primary);
+    border-radius: 2px;
+    padding: 1rem 1.1rem;
+    box-shadow: none;
+}
+
+[data-testid="stMetricLabel"] {
+    color: var(--text-muted);
+}
+
+[data-testid="stMetricValue"] {
+    color: var(--text);
+    font-weight: 650;
+}
+
+/* Tabs: dark-green navigation strip with a white active item. */
+div[data-baseweb="tab-list"] {
+    background-color: var(--brand-primary);
+    border: 1px solid var(--brand-primary-dark);
+    gap: 0.4rem;
+    padding: 0.4rem;
+}
+
+button[data-baseweb="tab"] {
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 2px;
+    color: var(--text-on-brand);
+    font-weight: 600;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+button[data-baseweb="tab"]:hover {
+    background-color: var(--brand-primary-dark);
+    color: var(--text-on-brand);
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    background-color: var(--surface);
+    border-color: var(--surface);
+    color: var(--brand-primary);
+}
+
+/* Buttons */
+.stButton > button,
+.stDownloadButton > button {
+    background-color: var(--brand-primary);
+    border: 1px solid var(--brand-primary-dark);
+    border-radius: 2px;
+    color: var(--text-on-brand);
+    font-weight: 600;
+}
+
+.stButton > button:hover,
+.stDownloadButton > button:hover {
+    background-color: var(--brand-primary-dark);
+    border-color: var(--brand-primary-dark);
+    color: var(--text-on-brand);
+}
+
+/* Input surfaces */
+[data-baseweb="select"] > div,
+[data-baseweb="input"] > div,
+[data-testid="stTextInput"] input {
+    background-color: var(--surface);
+    border-color: var(--border);
+    border-radius: 2px;
+}
+
+/* Tables, charts and expandable panels */
+[data-testid="stDataFrame"],
+[data-testid="stPlotlyChart"],
+[data-testid="stExpander"] {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+}
+
+/* Dividers */
+hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.25rem 0;
+}
