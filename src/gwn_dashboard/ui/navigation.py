@@ -1,4 +1,4 @@
-"""Query-parameter based navigation for the viewer-style shell."""
+"""Query-parameter based navigation for the platform and its modules."""
 
 from __future__ import annotations
 
@@ -15,19 +15,49 @@ class ViewerRoute:
     label: str
 
 
-START = ViewerRoute("start", "Start")
+START = ViewerRoute("platform", "Start")
+GROUNDWATER_DATA = ViewerRoute("groundwater-data", "Grundwasserdaten")
+GROUNDWATER_QUANTITY = ViewerRoute(
+    "groundwater-quantity",
+    "Grundwasserquantität",
+)
+GROUNDWATER_QUALITY = ViewerRoute(
+    "groundwater-quality",
+    "Grundwasserqualität",
+)
+METEOROLOGICAL_DATA = ViewerRoute(
+    "meteorological-data",
+    "Meteorologische Daten",
+)
+SCRIPT_LIBRARY = ViewerRoute("script-library", "Script-Bibliothek")
+
 MAPS = ViewerRoute("maps", "Karten")
 DIAGRAMS = ViewerRoute("diagrams", "Diagramme")
 NOMOGRAMS = ViewerRoute("nomograms", "Nomogramme")
 EXPORT = ViewerRoute("export", "Datenexport")
 INFORMATION = ViewerRoute("information", "Information")
 
+PLATFORM_ROUTES = (
+    START,
+    GROUNDWATER_DATA,
+    GROUNDWATER_QUANTITY,
+    GROUNDWATER_QUALITY,
+    METEOROLOGICAL_DATA,
+    SCRIPT_LIBRARY,
+)
 WORKSPACE_ROUTES = (MAPS, DIAGRAMS, NOMOGRAMS, EXPORT, INFORMATION)
-VALID_ROUTE_KEYS = {START.key, *(route.key for route in WORKSPACE_ROUTES)}
+GROUNDWATER_QUANTITY_ROUTES = {
+    GROUNDWATER_QUANTITY.key,
+    *(route.key for route in WORKSPACE_ROUTES),
+}
+VALID_ROUTE_KEYS = {
+    *(route.key for route in PLATFORM_ROUTES),
+    *(route.key for route in WORKSPACE_ROUTES),
+}
 
 
 def current_route() -> str:
-    """Return the current route from the URL, falling back to the landing page."""
+    """Return the current route from the URL, falling back to the platform."""
 
     value = st.query_params.get("view", START.key)
     if isinstance(value, list):

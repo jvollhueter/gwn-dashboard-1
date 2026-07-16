@@ -1,10 +1,11 @@
-"""Import smoke tests for the refactored architecture."""
+"""Import smoke tests for the application architecture."""
 
 import pytest
 
 
 @pytest.mark.smoke
 def test_application_modules_import() -> None:
+    """Verify application modules import."""
     from gwn_dashboard.application import create_app_context  # noqa: F401
     from gwn_dashboard.config import load_config  # noqa: F401
     from gwn_dashboard.design.plotly_theme import apply_dashboard_layout  # noqa: F401

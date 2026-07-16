@@ -9,6 +9,7 @@ from gwn_dashboard.services.comparison_service import ComparisonService
 
 
 def test_groundwater_recharge_is_sum_of_rg1_and_rg2() -> None:
+    """Verify groundwater recharge is sum of rg1 and rg2."""
     rg1 = pd.DataFrame({
         "id": [1, 1],
         "year": [2000, 2000],
@@ -28,6 +29,7 @@ def test_groundwater_recharge_is_sum_of_rg1_and_rg2() -> None:
 
 
 def test_period_comparison_calculates_absolute_and_relative_change() -> None:
+    """Verify period comparison calculates absolute and relative change."""
     data = pd.DataFrame({
         "GWK_ID": ["A", "A", "A", "A"],
         "year": [1961, 1962, 1991, 1992],

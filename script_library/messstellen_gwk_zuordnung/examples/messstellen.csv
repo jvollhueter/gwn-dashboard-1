@@ -1,0 +1,4 @@
+station_id,name,easting,northing
+M001,Beispiel Nord,332500,5652500
+M002,Beispiel Süd,337500,5647500
+M003,Außerhalb,350000,5660000

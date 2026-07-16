@@ -13,6 +13,11 @@ from gwn_dashboard.domain.models import Parameter, Period
 
 @dataclass(frozen=True)
 class ApplicationSettings:
+    """General application title and presentation settings.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     title: str
     page_title: str
     page_icon: str
@@ -22,13 +27,25 @@ class ApplicationSettings:
 
 @dataclass(frozen=True)
 class DataPaths:
+    """Configured paths to model data, mappings, geometries, and station metadata.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     base_directory: Path
     mapping_file: Path
     geometry_file: Path
+    station_overview_file: Path
+    station_mapping_file: Path
 
 
 @dataclass(frozen=True)
 class DashboardConfig:
+    """Complete validated dashboard configuration.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     application: ApplicationSettings
     data: DataPaths
     reference_period: Period
@@ -53,6 +70,18 @@ def _parameter(raw: dict[str, Any]) -> Parameter:
 
 
 def load_config(project_root: Path, config_path: Path | None = None) -> DashboardConfig:
+    """Load and validate dashboard configuration from YAML.
+    
+    Args:
+        project_root: Value of type ``Path``.
+        config_path: Value of type ``Path | None``.
+    
+    Returns:
+        DashboardConfig: Result produced by the operation.
+    
+    Raises:
+        ValueError: If required input data or metadata are invalid.
+    """
     path = config_path or project_root / "config" / "app_config.yaml"
     if not path.exists():
         raise FileNotFoundError(f"Konfigurationsdatei nicht gefunden: {path}")
@@ -72,6 +101,12 @@ def load_config(project_root: Path, config_path: Path | None = None) -> Dashboar
             base_directory=_resolve_path(project_root, str(data["base_directory"])),
             mapping_file=_resolve_path(project_root, str(data["mapping_file"])),
             geometry_file=_resolve_path(project_root, str(data["geometry_file"])),
+            station_overview_file=_resolve_path(
+                project_root, str(data["station_overview_file"])
+            ),
+            station_mapping_file=_resolve_path(
+                project_root, str(data["station_mapping_file"])
+            ),
         ),
         reference_period=Period(**periods["reference"]),
         comparison_period=Period(**periods["comparison"]),

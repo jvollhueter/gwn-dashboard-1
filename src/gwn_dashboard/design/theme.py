@@ -2,9 +2,9 @@
 
 The palette and layout roles reproduce the visual language of the supplied
 screenshots: dark-green navigation, light-gray application background, white
-work surfaces, restrained gray borders, blue primary data series and a
-salmon-red secondary series. The implementation adapts the existing dashboard
-content and does not copy GWN Viewer functionality.
+work surfaces, restrained gray borders, blue groundwater data, salmon-red
+precipitation and a clearly distinct violet ETp series. The implementation adapts
+the dashboard content and does not copy GWN Viewer functionality.
 """
 
 from dataclasses import dataclass
@@ -64,10 +64,10 @@ COLORS = ColorPalette(
     text="#56626E",
     text_strong="#3C3C3C",
     text_muted="#8B8B8B",
-    # Exact dominant chart colors sampled from the diagram screenshot.
+    # Viewer-based colors for GWN and precipitation; distinct violet for ETp.
     groundwater="#007BFF",
     precipitation="#F45B5B",
-    evapotranspiration="#F45B5B",
+    evapotranspiration="#7B2CBF",
     # Period and semantic colors.
     reference_period="#8B8B8B",
     comparison_period="#337E33",

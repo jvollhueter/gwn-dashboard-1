@@ -10,6 +10,7 @@ from gwn_dashboard.services.comparison_service import ComparisonService
 
 
 def test_period_comparison_calculates_expected_values_for_multiple_gwk() -> None:
+    """Verify period comparison calculates expected values for multiple gwk."""
     data = pd.DataFrame(
         {
             "GWK_ID": [
@@ -49,6 +50,7 @@ def test_period_comparison_calculates_expected_values_for_multiple_gwk() -> None
 
 
 def test_relative_change_is_nan_when_reference_mean_is_zero() -> None:
+    """Verify relative change is nan when reference mean is zero."""
     data = pd.DataFrame(
         {
             "GWK_ID": ["A", "A"],

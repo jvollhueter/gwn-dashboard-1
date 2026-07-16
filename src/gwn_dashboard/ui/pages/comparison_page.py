@@ -8,15 +8,27 @@ from gwn_dashboard.ui.pages.base_page import BasePage
 
 
 class ComparisonPage(BasePage):
+    """Provide the ComparisonPage operation.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def __init__(self, context: AppContext, data: DashboardData) -> None:
         self._context = context
         self._data = data
 
     @property
     def label(self) -> str:
+        """Return the human-readable page label.
+        
+        Returns:
+            str: Result produced by the operation.
+        """
         return "📊 Vergleich"
 
     def render(self) -> None:
+        """Render the component or page in Streamlit.
+        """
         st.header("Vergleich der ausgewählten Grundwasserkörper")
         st.plotly_chart(
             self._context.chart_factory.create_period_comparison(self._data.comparison),

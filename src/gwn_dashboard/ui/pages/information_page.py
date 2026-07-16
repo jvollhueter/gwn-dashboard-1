@@ -9,6 +9,8 @@ class InformationPage:
     """Render technical information and clearly marked legal placeholders."""
 
     def render(self) -> None:
+        """Render the component or page in Streamlit.
+        """
         section = current_information_section()
         st.markdown('<div class="viewer-information-shell">', unsafe_allow_html=True)
         st.title("Information")
@@ -30,8 +32,8 @@ class InformationPage:
                 Komponenten `rg1` und `rg2` gebildet und auf Ebene der ausgewählten
                 Grundwasserkörper ausgewertet.
 
-                **Referenzperiode:** 1961–1990  
-                **Vergleichsperiode:** 1991–2020  
+                **Vergleichszeiträume:** in den Analysemodulen frei wählbar  
+                **Standardwerte:** 1961–1990 und 1991–2020  
                 **Einheit:** mm/a
                 """
             )

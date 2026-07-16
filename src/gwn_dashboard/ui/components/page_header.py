@@ -9,6 +9,12 @@ class PageHeader:
     """Render a compact module heading consistent with the viewer layout."""
 
     def render(self, title: str, description: str | None = None) -> None:
+        """Render the component or page in Streamlit.
+        
+        Args:
+            title: Value of type ``str``.
+            description: Value of type ``str | None``.
+        """
         safe_title = escape(title)
         description_html = ""
         if description:

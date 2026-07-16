@@ -9,6 +9,11 @@ from gwn_dashboard.ui.pages.base_page import BasePage
 
 
 class TimeSeriesPage(BasePage):
+    """Render groundwater and meteorological annual time series.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def __init__(self, config: DashboardConfig, context: AppContext, data: DashboardData, selection: SidebarSelection) -> None:
         self._config = config
         self._context = context
@@ -17,9 +22,16 @@ class TimeSeriesPage(BasePage):
 
     @property
     def label(self) -> str:
+        """Return the human-readable page label.
+        
+        Returns:
+            str: Result produced by the operation.
+        """
         return "📈 Zeitreihen"
 
     def render(self) -> None:
+        """Render the component or page in Streamlit.
+        """
         groundwater_body = self._selection.selected_groundwater_body
         st.header(f"Zeitreihenanalyse: {groundwater_body}")
         comparison = self._data.comparison.query("GWK_ID == @groundwater_body")

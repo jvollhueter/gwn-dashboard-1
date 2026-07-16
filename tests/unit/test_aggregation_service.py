@@ -6,6 +6,7 @@ from gwn_dashboard.services.aggregation_service import AggregationService
 
 
 def test_monthly_values_are_summed_separately_by_id_and_year() -> None:
+    """Verify monthly values are summed separately by id and year."""
     monthly = pd.DataFrame(
         {
             "id": [1, 1, 1, 2, 2],
@@ -35,6 +36,7 @@ def test_monthly_values_are_summed_separately_by_id_and_year() -> None:
 
 
 def test_groundwater_recharge_combines_matching_rg1_and_rg2_values() -> None:
+    """Verify groundwater recharge combines matching rg1 and rg2 values."""
     rg1 = pd.DataFrame(
         {
             "id": [1, 1, 2],
@@ -72,6 +74,7 @@ def test_groundwater_recharge_combines_matching_rg1_and_rg2_values() -> None:
 
 
 def test_mapping_attaches_groundwater_body_id() -> None:
+    """Verify mapping attaches groundwater body id."""
     data = pd.DataFrame(
         {
             "id": [1, 2],
@@ -95,6 +98,7 @@ def test_mapping_attaches_groundwater_body_id() -> None:
 
 
 def test_filter_keeps_only_selected_groundwater_bodies() -> None:
+    """Verify filter keeps only selected groundwater bodies."""
     data = pd.DataFrame(
         {
             "GWK_ID": ["GWK_A", "GWK_B", "GWK_C"],

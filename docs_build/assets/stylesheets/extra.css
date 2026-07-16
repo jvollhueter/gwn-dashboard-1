@@ -1,0 +1,13 @@
+
+:root {
+  --md-primary-fg-color: #337e33;
+  --md-primary-fg-color--light: #5f9d5f;
+  --md-primary-fg-color--dark: #28652a;
+  --md-accent-fg-color: #28652a;
+}
+.md-header { box-shadow: 0 1px 4px rgba(0,0,0,.20); }
+.md-nav__title { font-weight: 700; }
+.md-typeset h1 { color: #174f22; font-weight: 700; }
+.md-typeset h2 { color: #28652a; font-weight: 650; }
+.md-typeset table:not([class]) th { background: #e8f3e8; }
+.md-typeset .grid.cards > ul > li { border-color: #ced4da; }

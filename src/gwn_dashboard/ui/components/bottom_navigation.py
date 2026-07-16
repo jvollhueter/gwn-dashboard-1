@@ -13,6 +13,11 @@ class BottomNavigation:
     """Render the fixed module navigation and highlight the active route."""
 
     def render(self, active_route: str) -> None:
+        """Render the component or page in Streamlit.
+        
+        Args:
+            active_route: Value of type ``str``.
+        """
         module_links = []
         for route in WORKSPACE_ROUTES:
             if route is INFORMATION:

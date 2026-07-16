@@ -1,4 +1,4 @@
-"""Streamlit entry point for the groundwater dashboard."""
+"""Streamlit entry point for the data platform."""
 
 from __future__ import annotations
 

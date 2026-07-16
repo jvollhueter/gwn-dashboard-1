@@ -9,6 +9,14 @@ class Sidebar:
     """Render dashboard filters and return a typed selection object."""
 
     def render(self, available_groundwater_bodies: list[str]) -> SidebarSelection:
+        """Render the component or page in Streamlit.
+        
+        Args:
+            available_groundwater_bodies: Value of type ``list[str]``.
+        
+        Returns:
+            SidebarSelection: Result produced by the operation.
+        """
         st.sidebar.header("⚙️ Konfiguration")
         selection_mode = st.sidebar.radio(
             "Auswahlmodus:",

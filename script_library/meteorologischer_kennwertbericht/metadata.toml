@@ -1,0 +1,19 @@
+[library]
+id = "meteorologischer-kennwertbericht"
+title = "Meteorologischer Kennwertbericht"
+short_description = "Erstellt Monats-, Jahres- und Saisonkennwerte für Niederschlag und ETp."
+long_description = """
+Das mehrteilige R-Werkzeug verarbeitet tägliche Niederschlags- und ETp-Daten. Es bildet monatliche, jährliche und saisonale Summen, kennzeichnet besonders trockene und feuchte Jahre und erstellt standardisierte Tabellen und Grafiken. Die Auswertungsfunktionen sind auf mehrere R-Dateien verteilt und werden über einen gemeinsamen Einstiegspunkt aufgerufen.
+"""
+category = "Meteorologische Daten"
+tags = ["niederschlag", "etp", "meteorologie", "aggregation", "bericht"]
+language = "R"
+author = "Referat 43"
+version = "1.0.0"
+updated = "2026-07-16"
+entry_point = "run_analysis.R"
+requires_runtime = "R >=4.2"
+dependencies = []
+input_formats = ["CSV"]
+output_formats = ["CSV", "PNG"]
+download_filename = "meteorologischer-kennwertbericht-1.0.0.zip"

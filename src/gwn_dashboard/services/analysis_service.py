@@ -8,7 +8,22 @@ from gwn_dashboard.domain.models import Period
 
 
 class AnalysisService:
+    """Calculate period statistics and monotonic or linear trends.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def period_statistics(self, data: pd.DataFrame, value_column: str, period: Period) -> pd.DataFrame:
+        """Calculate descriptive statistics for an inclusive period.
+        
+        Args:
+            data: Value of type ``pd.DataFrame``.
+            value_column: Value of type ``str``.
+            period: Value of type ``Period``.
+        
+        Returns:
+            pd.DataFrame: Result produced by the operation.
+        """
         subset = data[data["year"].between(period.start_year, period.end_year, inclusive="both")]
         rows = []
         for groundwater_body, group in subset.groupby("GWK_ID"):
@@ -26,6 +41,15 @@ class AnalysisService:
         return pd.DataFrame(rows)
 
     def trend_statistics(self, data: pd.DataFrame, value_column: str) -> pd.DataFrame:
+        """Calculate linear-regression and Kendall trend statistics.
+        
+        Args:
+            data: Value of type ``pd.DataFrame``.
+            value_column: Value of type ``str``.
+        
+        Returns:
+            pd.DataFrame: Result produced by the operation.
+        """
         rows = []
         for groundwater_body, group in data.groupby("GWK_ID"):
             clean = group[["year", value_column]].dropna().sort_values("year")

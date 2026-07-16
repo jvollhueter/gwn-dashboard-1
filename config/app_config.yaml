@@ -1,6 +1,6 @@
 application:
-  title: "GWN Viewer"
-  page_title: "GWN Viewer Sachsen"
+  title: "Plattform für Datenaufbereitung und  &#8209;visualisierung"
+  page_title: "Plattform für Datenaufbereitung und  &#8209;visualisierung"
   page_icon: "💧"
   layout: "wide"
   initial_sidebar_state: "collapsed"
@@ -9,6 +9,8 @@ data:
   base_directory: "data/kalib_beo_ERA5"
   mapping_file: "data/kalib_beo_ERA5/GWK_2025/GWK_2025.csv"
   geometry_file: "data/kalib_beo_ERA5/GWK_2025/GWK_2025.shp"
+  station_overview_file: "cache/Export_MKZ_Uebersicht.csv"
+  station_mapping_file: "data/MKZ_GWK.csv"
 
 periods:
   reference:

@@ -7,10 +7,21 @@ from gwn_dashboard.services.export_service import ExportService
 
 
 class ExportPanel:
+    """Render reusable CSV and Excel download controls.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def __init__(self, export_service: ExportService) -> None:
         self._export_service = export_service
 
     def render(self, data: DashboardData, number_of_groundwater_bodies: int) -> None:
+        """Render the component or page in Streamlit.
+        
+        Args:
+            data: Value of type ``DashboardData``.
+            number_of_groundwater_bodies: Value of type ``int``.
+        """
         st.sidebar.markdown("---")
         st.sidebar.subheader("📥 Daten-Export")
         st.sidebar.download_button(

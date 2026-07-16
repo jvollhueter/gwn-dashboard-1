@@ -9,6 +9,7 @@ from gwn_dashboard.services.analysis_service import AnalysisService
 
 
 def test_period_statistics_use_inclusive_period_boundaries() -> None:
+    """Verify period statistics use inclusive period boundaries."""
     data = pd.DataFrame(
         {
             "GWK_ID": ["A", "A", "A", "A"],
@@ -32,6 +33,7 @@ def test_period_statistics_use_inclusive_period_boundaries() -> None:
 
 
 def test_period_statistics_ignore_missing_values() -> None:
+    """Verify period statistics ignore missing values."""
     data = pd.DataFrame(
         {
             "GWK_ID": ["A", "A", "A"],
@@ -52,6 +54,7 @@ def test_period_statistics_ignore_missing_values() -> None:
 
 
 def test_trend_statistics_detect_perfect_linear_increase() -> None:
+    """Verify trend statistics detect perfect linear increase."""
     data = pd.DataFrame(
         {
             "GWK_ID": ["A", "A", "A", "A"],
@@ -73,6 +76,7 @@ def test_trend_statistics_detect_perfect_linear_increase() -> None:
 
 
 def test_trend_statistics_skip_groundwater_body_with_one_value() -> None:
+    """Verify trend statistics skip groundwater body with one value."""
     data = pd.DataFrame(
         {
             "GWK_ID": ["A"],

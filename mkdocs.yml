@@ -1,0 +1,142 @@
+site_name: Plattform für Datenaufbereitung und  &#8209;visualisierung
+site_description: Interne Projektdokumentation des Referats 43
+site_dir: docs_build
+docs_dir: docs
+use_directory_urls: false
+
+repo_name: Projektverzeichnis
+
+nav:
+  - Startseite: index.md
+  - Projekt:
+      - Projektüberblick: projekt/projektueberblick.md
+      - Web-Struktur: projekt/web-struktur.md
+  - Benutzerhandbuch: benutzerhandbuch/index.md
+  - Daten und Methoden: daten-und-methoden/index.md
+  - Script-Bibliothek: script-bibliothek/index.md
+  - Entwicklung:
+      - Softwarearchitektur: entwicklung/architektur.md
+      - Konfiguration: entwicklung/konfiguration.md
+      - Installation und Entwicklung: entwicklung/installation-und-entwicklung.md
+      - Tests: entwicklung/tests.md
+      - Betrieb und Wartung: entwicklung/betrieb-und-wartung.md
+      - Dateireferenz: entwicklung/dateireferenz.md
+  - Glossar: glossar.md
+
+  - API-Referenz:
+      - Überblick: api/index.md
+      - Anwendung:
+          - Anwendungskomposition: api/application/application.md
+          - Konfiguration: api/config/config.md
+      - Domain:
+          - Fachliche Modelle: api/domain/models.md
+          - Script-Metadaten: api/domain/script_library.md
+      - Repositories:
+          - Schnittstellen: api/repositories/interfaces.md
+          - Grundwasserdaten: api/repositories/csv_repository.md
+          - Script-Bibliothek: api/repositories/script_library_repository.md
+      - Services:
+          - Aggregation: api/services/aggregation_service.md
+          - Analyse: api/services/analysis_service.md
+          - Periodenvergleich: api/services/comparison_service.md
+          - Dashboard: api/services/dashboard_service.md
+          - Export: api/services/export_service.md
+          - Script-Bibliothek: api/services/script_library_service.md
+      - Design:
+          - Theme: api/design/theme.md
+          - Plotly-Theme: api/design/plotly_theme.md
+          - Style Loader: api/design/style_loader.md
+      - Visualisierung:
+          - Diagramme: api/visualization/chart_factory.md
+          - Karten: api/visualization/map_factory.md
+      - Benutzeroberfläche:
+          - Kern:
+              - Anwendung: api/ui_core/application.md
+              - Navigation: api/ui_core/navigation.md
+              - Sidebar: api/ui_core/sidebar.md
+          - Komponenten:
+              - Kopfzeile: api/ui_components/app_header.md
+              - Fußnavigation: api/ui_components/bottom_navigation.md
+              - Kontextleiste: api/ui_components/context_bar.md
+              - Exportpanel: api/ui_components/export_panel.md
+              - Kennzahlenpanel: api/ui_components/metric_panel.md
+              - Seitenkopf: api/ui_components/page_header.md
+              - Viewer-Steuerung: api/ui_components/viewer_controls.md
+          - Seiten:
+              - Basisklasse: api/ui_pages/base_page.md
+              - Landing-Pages: api/ui_pages/landing_page.md
+              - Karten: api/ui_pages/map_page.md
+              - Diagramme: api/ui_pages/diagram_page.md
+              - Nomogramme: api/ui_pages/nomogram_page.md
+              - Datenexport: api/ui_pages/export_page.md
+              - Information: api/ui_pages/information_page.md
+              - Script-Bibliothek: api/ui_pages/script_library_page.md
+              - Zeitreihen: api/ui_pages/timeseries_page.md
+              - Vergleiche: api/ui_pages/comparison_page.md
+              - Korrelation: api/ui_pages/correlation_page.md
+              - Statistik: api/ui_pages/statistics_page.md
+
+
+theme:
+  name: material
+  language: de
+  palette:
+    - scheme: default
+      primary: green
+      accent: green
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+  icon:
+    repo: material/folder
+
+plugins:
+  - search:
+      lang: de
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - src
+          options:
+            docstring_style: google
+            show_source: true
+            show_signature_annotations: true
+            separate_signature: true
+            members_order: source
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+validation:
+  links:
+    absolute_links: relative_to_docs
+    anchors: warn
+  nav:
+    omitted_files: warn
+    not_found: warn

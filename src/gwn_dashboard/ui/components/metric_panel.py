@@ -7,10 +7,21 @@ from gwn_dashboard.domain.models import DashboardData, SidebarSelection
 
 
 class MetricPanel:
+    """Render headline metrics for one selected groundwater body.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def __init__(self, config: DashboardConfig) -> None:
         self._config = config
 
     def render(self, data: DashboardData, selection: SidebarSelection) -> None:
+        """Render the component or page in Streamlit.
+        
+        Args:
+            data: Value of type ``DashboardData``.
+            selection: Value of type ``SidebarSelection``.
+        """
         st.subheader(f"📊 Übersicht: {len(selection.groundwater_body_ids)} ausgewählte GWK")
         col1, col2, col3, col4 = st.columns(4)
         comparison = data.comparison

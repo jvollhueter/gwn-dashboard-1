@@ -6,6 +6,7 @@ from gwn_dashboard.domain.models import Period
 
 
 def test_period_contains_inclusive_boundaries() -> None:
+    """Verify period contains inclusive boundaries."""
     period = Period(
         label="1961–1990",
         start_year=1961,
@@ -19,6 +20,7 @@ def test_period_contains_inclusive_boundaries() -> None:
 
 
 def test_period_rejects_start_year_after_end_year() -> None:
+    """Verify period rejects start year after end year."""
     with pytest.raises(
         ValueError,
         match="start_year must not be greater than end_year",

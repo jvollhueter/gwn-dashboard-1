@@ -1,0 +1,19 @@
+[library]
+id = "messstellen-gwk-zuordnung"
+title = "Messstellen einem Grundwasserkörper zuordnen"
+short_description = "Ordnet Messstellen anhand ihrer Koordinaten räumlich einem Grundwasserkörper zu."
+long_description = """
+Das Werkzeug liest Messstellenkoordinaten und eine Polygongeometrie der Grundwasserkörper ein. Die Punktdaten werden in ein GeoDataFrame überführt, in das Koordinatensystem der Flächendaten transformiert und über eine räumliche Verknüpfung zugeordnet. Nicht zuordenbare oder mehrfach getroffene Messstellen werden im Ergebnis eindeutig gekennzeichnet.
+"""
+category = "Grundwasserquantität"
+tags = ["messstellen", "gwk", "geodaten", "räumliche-zuordnung", "geopandas"]
+language = "Python"
+author = "Referat 43"
+version = "1.0.0"
+updated = "2026-07-16"
+entry_point = "main.py"
+requires_runtime = "Python >=3.10"
+dependencies = ["pandas", "geopandas", "shapely", "pyproj"]
+input_formats = ["CSV", "GeoJSON", "GeoPackage", "Shapefile"]
+output_formats = ["CSV", "GeoPackage"]
+download_filename = "messstellen-gwk-zuordnung-1.0.0.zip"

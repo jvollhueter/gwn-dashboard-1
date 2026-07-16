@@ -22,6 +22,7 @@ class SyntheticGroundwaterDataRepository(GroundwaterDataRepository):
     """Small deterministic repository for an end-to-end service test."""
 
     def load_mapping(self) -> pd.DataFrame:
+        """Verify load mapping."""
         return pd.DataFrame(
             {
                 "id": [1, 2],
@@ -30,9 +31,11 @@ class SyntheticGroundwaterDataRepository(GroundwaterDataRepository):
         )
 
     def get_available_groundwater_bodies(self) -> list[str]:
+        """Verify get available groundwater bodies."""
         return ["GWK_A", "GWK_B"]
 
     def load_monthly_parameter(self, parameter_code: str) -> pd.DataFrame:
+        """Verify load monthly parameter."""
         values = {
             "rg1": [40.0, 60.0, 80.0, 100.0],
             "rg2": [4.0, 6.0, 8.0, 10.0],
@@ -49,10 +52,16 @@ class SyntheticGroundwaterDataRepository(GroundwaterDataRepository):
         )
 
     def load_geometries(self):
+        """Verify load geometries."""
+        raise NotImplementedError
+
+    def load_monitoring_stations(self):
+        """Verify load monitoring stations."""
         raise NotImplementedError
 
 
 def create_test_config(project_root: Path) -> DashboardConfig:
+    """Verify create config."""
     return DashboardConfig(
         application=ApplicationSettings(
             title="Test dashboard",
@@ -65,6 +74,8 @@ def create_test_config(project_root: Path) -> DashboardConfig:
             base_directory=project_root,
             mapping_file=project_root / "mapping.csv",
             geometry_file=project_root / "geometry.shp",
+            station_overview_file=project_root / "stations.csv",
+            station_mapping_file=project_root / "station_mapping.csv",
         ),
         reference_period=Period("Referenz", 2000, 2000),
         comparison_period=Period("Vergleich", 2010, 2010),
@@ -91,6 +102,7 @@ def create_test_config(project_root: Path) -> DashboardConfig:
 def test_dashboard_service_builds_expected_data_for_selected_gwk(
     tmp_path: Path,
 ) -> None:
+    """Verify dashboard service builds expected data for selected gwk."""
     analysis = AnalysisService()
     service = DashboardService(
         config=create_test_config(tmp_path),
@@ -125,3 +137,67 @@ def test_dashboard_service_builds_expected_data_for_selected_gwk(
 
     trend = result.trends.iloc[0]
     assert trend["lr_slope"] == pytest.approx(2.2)
+
+
+@pytest.mark.integration
+def test_dashboard_service_reports_common_available_year_range(
+    tmp_path: Path,
+) -> None:
+    """Verify dashboard service reports common available year range."""
+    analysis = AnalysisService()
+    service = DashboardService(
+        config=create_test_config(tmp_path),
+        repository=SyntheticGroundwaterDataRepository(),
+        aggregation_service=AggregationService(),
+        analysis_service=analysis,
+        comparison_service=ComparisonService(analysis),
+    )
+
+    assert service.get_available_year_range() == (2000, 2010)
+
+
+@pytest.mark.integration
+def test_dashboard_service_accepts_individually_selected_periods(
+    tmp_path: Path,
+) -> None:
+    """Verify dashboard service accepts individually selected periods."""
+    analysis = AnalysisService()
+    service = DashboardService(
+        config=create_test_config(tmp_path),
+        repository=SyntheticGroundwaterDataRepository(),
+        aggregation_service=AggregationService(),
+        analysis_service=analysis,
+        comparison_service=ComparisonService(analysis),
+    )
+
+    result = service.load_dashboard_data(
+        ("GWK_A",),
+        reference_period=Period("Individuelle Referenz", 2000, 2000),
+        comparison_period=Period("Individueller Vergleich", 2010, 2010),
+    )
+
+    comparison = result.comparison.iloc[0]
+    assert comparison["mean_ref"] == 44.0
+    assert comparison["mean_hist"] == 66.0
+
+
+@pytest.mark.integration
+def test_dashboard_service_rejects_overlapping_periods(
+    tmp_path: Path,
+) -> None:
+    """Verify dashboard service rejects overlapping periods."""
+    analysis = AnalysisService()
+    service = DashboardService(
+        config=create_test_config(tmp_path),
+        repository=SyntheticGroundwaterDataRepository(),
+        aggregation_service=AggregationService(),
+        analysis_service=analysis,
+        comparison_service=ComparisonService(analysis),
+    )
+
+    with pytest.raises(ValueError, match="müssen getrennt sein"):
+        service.load_dashboard_data(
+            ("GWK_A",),
+            reference_period=Period("Referenz", 2000, 2005),
+            comparison_period=Period("Vergleich", 2005, 2010),
+        )

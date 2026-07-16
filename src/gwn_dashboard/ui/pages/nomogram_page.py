@@ -1,4 +1,4 @@
-"""Nomogram-like relationship page based on the existing correlation analysis."""
+"""Nomogram-like relationship page for correlation analysis."""
 
 import streamlit as st
 from scipy.stats import linregress
@@ -22,6 +22,8 @@ class NomogramPage:
         self._selection = selection
 
     def render(self) -> None:
+        """Render the component or page in Streamlit.
+        """
         controls, chart = st.columns([1.0, 2.05], gap="small")
         with controls:
             with st.container(border=True):

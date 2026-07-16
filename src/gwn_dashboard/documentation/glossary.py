@@ -1,0 +1,3 @@
+"""
+.. include:: ./glossary.md
+"""

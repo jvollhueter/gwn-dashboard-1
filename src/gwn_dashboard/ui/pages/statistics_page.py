@@ -7,14 +7,26 @@ from gwn_dashboard.ui.pages.base_page import BasePage
 
 
 class StatisticsPage(BasePage):
+    """Render descriptive and trend-statistics tables and graphics.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def __init__(self, data: DashboardData) -> None:
         self._data = data
 
     @property
     def label(self) -> str:
+        """Return the human-readable page label.
+        
+        Returns:
+            str: Result produced by the operation.
+        """
         return "📋 Statistiken"
 
     def render(self) -> None:
+        """Render the component or page in Streamlit.
+        """
         st.header("Vollständige Statistiken")
         significant_only = st.checkbox("Nur lineare Trends mit p < 0,05 anzeigen", value=False)
         trends = self._data.trends

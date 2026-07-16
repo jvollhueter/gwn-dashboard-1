@@ -15,6 +15,11 @@ from gwn_dashboard.visualization.map_factory import MapFactory
 
 @dataclass(frozen=True)
 class AppContext:
+    """Container holding configured repositories, services, and visualization factories.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     dashboard_service: DashboardService
     export_service: ExportService
     chart_factory: ChartFactory
@@ -22,6 +27,17 @@ class AppContext:
 
 
 def create_app_context(config: DashboardConfig) -> AppContext:
+    """Create and wire all application dependencies.
+    
+    Args:
+        config: Value of type ``DashboardConfig``.
+    
+    Returns:
+        AppContext: Result produced by the operation.
+    
+    Raises:
+        ValueError: If required input data or metadata are invalid.
+    """
     repository = CsvGroundwaterDataRepository(config.data)
     aggregation = AggregationService()
     analysis = AnalysisService()

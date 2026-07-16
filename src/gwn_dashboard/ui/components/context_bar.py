@@ -15,6 +15,11 @@ class ContextBar:
         self._config = config
 
     def render(self, selection: SidebarSelection) -> None:
+        """Render the component or page in Streamlit.
+        
+        Args:
+            selection: Value of type ``SidebarSelection``.
+        """
         selected = len(selection.groundwater_body_ids)
         detail = escape(selection.selected_groundwater_body)
         reference = escape(self._config.reference_period.label)

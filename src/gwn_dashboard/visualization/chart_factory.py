@@ -1,5 +1,7 @@
 """Plotly chart factory."""
 
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -10,10 +12,15 @@ from scipy.stats import linregress
 from gwn_dashboard.config import DashboardConfig
 from gwn_dashboard.design.plotly_theme import apply_dashboard_layout
 from gwn_dashboard.design.theme import COLORS
-from gwn_dashboard.domain.models import DashboardData
+from gwn_dashboard.domain.models import DashboardData, Period
 
 
 class ChartFactory:
+    """Create consistently styled Plotly figures.
+    
+    Notes:
+        The class is part of the documented public application architecture.
+    """
     def __init__(self, config: DashboardConfig) -> None:
         self._config = config
 
@@ -23,7 +30,29 @@ class ChartFactory:
         groundwater_body: str,
         show_precipitation: bool,
         show_evapotranspiration: bool,
+        reference_period: Period | None = None,
+        comparison_period: Period | None = None,
     ) -> go.Figure:
+        """Create an annual groundwater-recharge time-series figure.
+        
+        Args:
+            data: Value of type ``DashboardData``.
+            groundwater_body: Value of type ``str``.
+            show_precipitation: Value of type ``bool``.
+            show_evapotranspiration: Value of type ``bool``.
+            reference_period: Value of type ``Period | None``.
+            comparison_period: Value of type ``Period | None``.
+        
+        Returns:
+            go.Figure: Result produced by the operation.
+        
+        Raises:
+            ValueError: If required input data or metadata are invalid.
+        """
+        reference, comparison = self._resolve_periods(
+            reference_period,
+            comparison_period,
+        )
         recharge = data.groundwater_recharge.query(
             "GWK_ID == @groundwater_body"
         ).sort_values("year")
@@ -42,18 +71,26 @@ class ChartFactory:
                 name="Grundwasserneubildung",
                 mode="lines+markers",
                 line={"color": COLORS.groundwater, "width": 1.6},
-                marker={"color": COLORS.groundwater, "size": 6, "symbol": "circle"},
+                marker={
+                    "color": COLORS.groundwater,
+                    "size": 6,
+                    "symbol": "circle",
+                },
             ),
             secondary_y=False,
         )
 
         period_styles = (
-            (self._config.reference_period, COLORS.reference_period, "dash"),
-            (self._config.comparison_period, COLORS.comparison_period, "dot"),
+            (reference, COLORS.reference_period, "dash"),
+            (comparison, COLORS.comparison_period, "dot"),
         )
         for period, color, dash in period_styles:
             mean_value = recharge.loc[
-                recharge["year"].between(period.start_year, period.end_year),
+                recharge["year"].between(
+                    period.start_year,
+                    period.end_year,
+                    inclusive="both",
+                ),
                 "gwn_mm_a",
             ].mean()
             figure.add_trace(
@@ -82,7 +119,11 @@ class ChartFactory:
                     name="Niederschlag",
                     mode="lines+markers",
                     line={"color": COLORS.precipitation, "width": 1.5},
-                    marker={"color": COLORS.precipitation, "size": 5, "symbol": "square"},
+                    marker={
+                        "color": COLORS.precipitation,
+                        "size": 5,
+                        "symbol": "square",
+                    },
                 ),
                 secondary_y=True,
             )
@@ -98,7 +139,11 @@ class ChartFactory:
                         "color": COLORS.evapotranspiration,
                         "width": 1.5,
                     },
-                    marker={"color": COLORS.evapotranspiration, "size": 5, "symbol": "diamond"},
+                    marker={
+                        "color": COLORS.evapotranspiration,
+                        "size": 5,
+                        "symbol": "diamond",
+                    },
                 ),
                 secondary_y=True,
             )
@@ -121,6 +166,18 @@ class ChartFactory:
         data: DashboardData,
         groundwater_body: str,
     ) -> go.Figure | None:
+        """Create an exploratory recharge–precipitation scatter plot.
+        
+        Args:
+            data: Value of type ``DashboardData``.
+            groundwater_body: Value of type ``str``.
+        
+        Returns:
+            go.Figure | None: Result produced by the operation.
+        
+        Raises:
+            ValueError: If required input data or metadata are invalid.
+        """
         recharge = data.groundwater_recharge.query(
             "GWK_ID == @groundwater_body"
         )[["year", "gwn_mm_a"]]
@@ -164,28 +221,64 @@ class ChartFactory:
             height=500,
         )
 
-    def create_period_comparison(self, comparison: pd.DataFrame) -> go.Figure:
+    def create_period_comparison(
+        self,
+        comparison_data: pd.DataFrame,
+        reference_period: Period | None = None,
+        comparison_period: Period | None = None,
+    ) -> go.Figure:
+        """Create a groundwater-body period-comparison figure.
+        
+        Args:
+            comparison_data: Value of type ``pd.DataFrame``.
+            reference_period: Value of type ``Period | None``.
+            comparison_period: Value of type ``Period | None``.
+        
+        Returns:
+            go.Figure: Result produced by the operation.
+        
+        Raises:
+            ValueError: If required input data or metadata are invalid.
+        """
+        reference, comparison = self._resolve_periods(
+            reference_period,
+            comparison_period,
+        )
         figure = go.Figure()
         figure.add_bar(
-            x=comparison["GWK_ID"],
-            y=comparison["mean_ref"],
-            name=self._config.reference_period.label,
+            x=comparison_data["GWK_ID"],
+            y=comparison_data["mean_ref"],
+            name=reference.label,
             marker_color=COLORS.reference_period,
         )
         figure.add_bar(
-            x=comparison["GWK_ID"],
-            y=comparison["mean_hist"],
-            name=self._config.comparison_period.label,
+            x=comparison_data["GWK_ID"],
+            y=comparison_data["mean_hist"],
+            name=comparison.label,
             marker_color=COLORS.comparison_period,
         )
         figure.update_layout(barmode="group", yaxis_title="GWN [mm/a]")
         return apply_dashboard_layout(
             figure,
-            title="Vergleich der mittleren Grundwasserneubildung",
+            title=(
+                "Vergleich der mittleren Grundwasserneubildung "
+                f"({reference.label} / {comparison.label})"
+            ),
             height=400,
         )
 
     def create_change_histogram(self, comparison: pd.DataFrame) -> go.Figure:
+        """Create a histogram of groundwater-recharge changes.
+        
+        Args:
+            comparison: Value of type ``pd.DataFrame``.
+        
+        Returns:
+            go.Figure: Result produced by the operation.
+        
+        Raises:
+            ValueError: If required input data or metadata are invalid.
+        """
         figure = px.histogram(
             comparison,
             x="delta_abs",
@@ -199,14 +292,13 @@ class ChartFactory:
             height=400,
         )
 
-
     def create_value_histogram(
         self,
         data: pd.DataFrame,
         value_column: str,
         title: str,
     ) -> go.Figure:
-        """Create a compact histogram for the viewer's map statistics panel."""
+        """Create a compact histogram for the map statistics panel."""
 
         figure = px.histogram(
             data.dropna(subset=[value_column]),
@@ -222,15 +314,37 @@ class ChartFactory:
             height=260,
         )
 
-    def create_period_boxplot(self, comparison: pd.DataFrame) -> go.Figure:
+    def create_period_boxplot(
+        self,
+        comparison_data: pd.DataFrame,
+        reference_period: Period | None = None,
+        comparison_period: Period | None = None,
+    ) -> go.Figure:
+        """Create box plots for reference and comparison values.
+        
+        Args:
+            comparison_data: Value of type ``pd.DataFrame``.
+            reference_period: Value of type ``Period | None``.
+            comparison_period: Value of type ``Period | None``.
+        
+        Returns:
+            go.Figure: Result produced by the operation.
+        
+        Raises:
+            ValueError: If required input data or metadata are invalid.
+        """
+        reference, comparison = self._resolve_periods(
+            reference_period,
+            comparison_period,
+        )
         box_data = pd.concat(
             [
-                comparison[["GWK_ID", "mean_ref"]]
+                comparison_data[["GWK_ID", "mean_ref"]]
                 .rename(columns={"mean_ref": "GWN"})
-                .assign(Periode=self._config.reference_period.label),
-                comparison[["GWK_ID", "mean_hist"]]
+                .assign(Periode=reference.label),
+                comparison_data[["GWK_ID", "mean_hist"]]
                 .rename(columns={"mean_hist": "GWN"})
-                .assign(Periode=self._config.comparison_period.label),
+                .assign(Periode=comparison.label),
             ],
             ignore_index=True,
         )
@@ -240,12 +354,22 @@ class ChartFactory:
             y="GWN",
             color="Periode",
             color_discrete_map={
-                self._config.reference_period.label: COLORS.reference_period,
-                self._config.comparison_period.label: COLORS.comparison_period,
+                reference.label: COLORS.reference_period,
+                comparison.label: COLORS.comparison_period,
             },
         )
         return apply_dashboard_layout(
             figure,
             title="Verteilung der mittleren GWN nach Periode",
             height=400,
+        )
+
+    def _resolve_periods(
+        self,
+        reference_period: Period | None,
+        comparison_period: Period | None,
+    ) -> tuple[Period, Period]:
+        return (
+            reference_period or self._config.reference_period,
+            comparison_period or self._config.comparison_period,
         )
